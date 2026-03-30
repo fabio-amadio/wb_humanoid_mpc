@@ -9,6 +9,12 @@
 #
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOST_REPO="$(realpath "${SCRIPT_DIR}/..")"
+HOST_WS_CACHE="${HOST_REPO}/.docker_ws"
+CONTAINER_WS="/wb_humanoid_mpc_ws"
+CONTAINER_REPO="${CONTAINER_WS}/src/wb_humanoid_mpc"
+
 # Allow GUI applications
 xhost +SI:localuser:root
 
@@ -22,10 +28,10 @@ if [ ! -f "${XAUTH}" ]; then
   chmod a+r "${XAUTH}"
 fi
 
-# ROOT_COLCON_WS 
-HOST_WS="$(realpath "${PWD}/../../..")"
+# Keep the colcon workspace artifacts on the host between container runs.
+mkdir -p "${HOST_WS_CACHE}/src" "${HOST_WS_CACHE}/build" "${HOST_WS_CACHE}/install" "${HOST_WS_CACHE}/log" "${HOST_WS_CACHE}/.ccache"
 
-# Run the container, mounting the entire workspace
+# Run the container, mounting the repo at the expected colcon workspace path
 docker run --rm -it \
   --name wb-mpc-dev \
   --net host \
@@ -37,10 +43,10 @@ docker run --rm -it \
   -e XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}" \
   -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
   -v "${XAUTH}:${XAUTH}:rw" \
-  -v "${HOST_WS}:/wb_humanoid_mpc_ws:cached" \
-  --workdir /wb_humanoid_mpc_ws \
+  -v "${HOST_WS_CACHE}:${CONTAINER_WS}:cached" \
+  -v "${HOST_REPO}:${CONTAINER_REPO}:cached" \
+  --workdir "${CONTAINER_REPO}" \
   wb-humanoid-mpc:dev \
   bash
 
 echo "Done."
-

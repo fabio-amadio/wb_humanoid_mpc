@@ -60,3 +60,4 @@ install/
 **/.gdb_history
 
 .git-completion.bash
+/.docker_ws/
