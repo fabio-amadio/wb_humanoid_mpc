@@ -181,11 +181,23 @@ launch-g1-dummy-sim:
 	source install/setup.bash && \
 	ros2 launch g1_centroidal_mpc dummy_sim.launch.py 
 
+launch-g1-dummy-sim-refs:
+	cd ${build_dir} && \
+	source ${ros_source_file} && \
+	source install/setup.bash && \
+	ros2 launch g1_centroidal_mpc dummy_sim.launch.py publish_reference_joint_states:=true
+
 launch-g1-sim:
 	cd ${build_dir} && \
 	source ${ros_source_file} && \
 	source install/setup.bash && \
 	ros2 launch g1_centroidal_mpc mujoco_sim.launch.py 
+
+launch-g1-sim-refs:
+	cd ${build_dir} && \
+	source ${ros_source_file} && \
+	source install/setup.bash && \
+	ros2 launch g1_centroidal_mpc mujoco_sim.launch.py publish_reference_joint_states:=true
 
 
 launch-wb-g1-dummy-sim:
@@ -215,4 +227,3 @@ run-mpc-tests:
 	source install/setup.bash && \
 	colcon test --event-handlers console_direct+ --return-code-on-test-failure --packages-select humanoid_common_mpc \
 	humanoid_common_mpc_ros2 humanoid_centroidal_mpc humanoid_centroidal_mpc_ros2 humanoid_wb_mpc
-

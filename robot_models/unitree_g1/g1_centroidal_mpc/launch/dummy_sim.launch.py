@@ -2,6 +2,10 @@ from ament_index_python.packages import get_package_share_directory
 
 import launch
 from humanoid_common_mpc_ros2.mpc_launch_config import MPCLaunchConfig
+from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
 
 
 def generate_launch_description():
@@ -24,10 +28,32 @@ def generate_launch_description():
     cfg.ld.add_action(cfg.declare_gait_command_file)
     cfg.ld.add_action(cfg.declare_urdf_path)
     cfg.ld.add_action(cfg.declare_rviz_config_path)
+    cfg.ld.add_action(
+        DeclareLaunchArgument(
+            "publish_reference_joint_states",
+            default_value="false",
+            description="Publish live MPC joint position/velocity references as sensor_msgs/JointState.",
+        )
+    )
+
+    reference_joint_state_publisher_node = Node(
+        package="humanoid_centroidal_mpc_ros2",
+        executable="humanoid_centroidal_mpc_reference_joint_state_node",
+        name="reference_joint_state_publisher",
+        output="screen",
+        arguments=[
+            LaunchConfiguration("robot_name"),
+            LaunchConfiguration("config_name"),
+            LaunchConfiguration("target_command_file"),
+            LaunchConfiguration("description_name"),
+        ],
+        condition=IfCondition(LaunchConfiguration("publish_reference_joint_states")),
+    )
 
     # Add nodes
     cfg.ld.add_action(cfg.mpc_node)
     cfg.ld.add_action(cfg.dummy_sim_node)
+    cfg.ld.add_action(reference_joint_state_publisher_node)
     cfg.ld.add_action(cfg.robot_state_publisher_node)
     cfg.ld.add_action(cfg.terminal_robot_state_publisher_node)
     cfg.ld.add_action(cfg.target_robot_state_publisher_node)

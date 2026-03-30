@@ -146,6 +146,15 @@ target_link_libraries(humanoid_centroidal_mpc_sim
 )
 target_compile_options(humanoid_centroidal_mpc_sim PUBLIC ${FLAGS})
 
+# Reference Joint State Publisher Node
+add_executable(humanoid_centroidal_mpc_reference_joint_state_node
+  src/CentroidalReferenceJointStateNode.cpp
+)
+ament_target_dependencies(humanoid_centroidal_mpc_reference_joint_state_node
+  ${dependencies}
+)
+target_compile_options(humanoid_centroidal_mpc_reference_joint_state_node PUBLIC ${FLAGS})
+
 # Pose Command Node
 add_executable(humanoid_centroidal_mpc_pose_command_node
   src/CentroidalMpcKeyboardPoseCommandNode.cpp
@@ -195,6 +204,7 @@ install(TARGETS
   humanoid_centroidal_mpc_sim
   humanoid_centroidal_mpc_sqp_node
   humanoid_centroidal_mpc_dummy_sim_node
+  humanoid_centroidal_mpc_reference_joint_state_node
   humanoid_centroidal_mpc_pose_command_node
   DESTINATION lib/${PROJECT_NAME}
 )
@@ -209,4 +219,3 @@ ament_export_include_directories(include)
 # ament_export_libraries(${PROJECT_NAME})
 ament_export_dependencies(${dependencies})
 ament_package()
-
