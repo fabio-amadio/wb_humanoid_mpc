@@ -30,6 +30,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include <memory>
+#include <string>
+
 #include <ocs2_core/cost/StateInputGaussNewtonCostAd.h>
 #include <ocs2_pinocchio_interface/PinocchioInterface.h>
 #include <ocs2_robotic_tools/end_effector/EndEffectorKinematics.h>
@@ -39,6 +42,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "humanoid_common_mpc/common/MpcRobotModelBase.h"
 
 #include "humanoid_common_mpc/cost/EndEffectorKinematicCostHelpers.h"
+#include "humanoid_common_mpc/reference_manager/HandPoseReferenceManager.h"
 
 namespace ocs2::humanoid {
 
@@ -47,9 +51,12 @@ class EndEffectorKinematicsQuadraticCost : public ocs2::StateInputCostGaussNewto
   EndEffectorKinematicsQuadraticCost(EndEffectorKinematicsWeights weights,
                                      const PinocchioInterface& pinocchioInterface,
                                      const EndEffectorKinematics<scalar_t>& endEffectorKinematics,
+                                     const MpcRobotModelBase<scalar_t>& mpcRobotModel,
                                      const MpcRobotModelBase<ad_scalar_t>& mpcRobotModelAD,
                                      std::string endEffectorName,
-                                     const ModelSettings& modelSettings);
+                                     const ModelSettings& modelSettings,
+                                     std::shared_ptr<HandPoseReferenceManager> handPoseReferenceManagerPtr = nullptr,
+                                     std::string handPoseReferenceName = "");
 
   ~EndEffectorKinematicsQuadraticCost() override = default;
   EndEffectorKinematicsQuadraticCost* clone() const override { return new EndEffectorKinematicsQuadraticCost(*this); }
@@ -67,12 +74,16 @@ class EndEffectorKinematicsQuadraticCost : public ocs2::StateInputCostGaussNewto
   void getWeights(vector12_t& weights) const { weights = sqrtWeights_.cwiseProduct(sqrtWeights_); }
   void setWeights(const vector12_t& weights) { sqrtWeights_ = weights.cwiseSqrt(); }
 
- protected:
-  EndEffectorKinematicsQuadraticCost(const EndEffectorKinematicsQuadraticCost& other);
-
   static EndEffectorKinematicsCostElement<scalar_t> getReferenceCostElement(const vector_t& state,
                                                                             const vector_t& input,
                                                                             const EndEffectorKinematics<scalar_t>& endEffectorKinematics);
+
+ protected:
+  EndEffectorKinematicsQuadraticCost(const EndEffectorKinematicsQuadraticCost& other);
+
+  EndEffectorKinematicsCostElement<scalar_t> getExternalReferenceCostElement(const vector_t& state,
+                                                                             const vector_t& input,
+                                                                             const HandPoseReference& pelvisFrameReference) const;
 
   ad_vector_t costVectorFunction(ad_scalar_t time,
                                  const ad_vector_t& state,
@@ -84,7 +95,10 @@ class EndEffectorKinematicsQuadraticCost : public ocs2::StateInputCostGaussNewto
   pinocchio::FrameIndex frameID_;
   PinocchioInterfaceCppAd pinocchioInterfaceCppAd_;
   const std::unique_ptr<EndEffectorKinematics<scalar_t>> endEffectorKinematicsPtr_;
+  std::unique_ptr<MpcRobotModelBase<scalar_t>> mpcRobotModelPtr;
   std::unique_ptr<MpcRobotModelBase<ad_scalar_t>> mpcRobotModelADPtr;
+  std::shared_ptr<HandPoseReferenceManager> handPoseReferenceManagerPtr_;
+  std::string handPoseReferenceName_;
   bool isActive_ = true;
 };
 

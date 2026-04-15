@@ -117,6 +117,48 @@ For the **Whole-Body Dynamics MPC**
 make launch-wb-g1-dummy-sim
 ```
 
+For the **Centroidal Dynamics MPC with Cartesian hand pose references**
+
+```
+make launch-g1-dummy-sim-hands-cartesian
+```
+
+The hand references are expressed in the `pelvis` frame and can be sent through ROS 2 topics. To send commands while the simulation is running, open another terminal in the same Docker container. If you are using VS Code Dev Containers, open a new integrated terminal.
+
+```bash
+ docker exec -it wb-mpc-dev bash
+```
+
+Then send a right hand pose reference:
+
+```bash
+ros2 topic pub --once /g1/right_hand_pose_reference geometry_msgs/msg/PoseStamped "{
+  header: {frame_id: 'pelvis'},
+  pose: {
+    position: {x: 0.250, y: -0.150, z: 0.10},
+    orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+  }
+}"
+```
+
+Another example target is:
+
+```bash
+ros2 topic pub --once /g1/right_hand_pose_reference geometry_msgs/msg/PoseStamped "{
+  header: {frame_id: 'pelvis'},
+  pose: {
+    position: {x: 0.35, y: -0.200, z: 0.20},
+    orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
+  }
+}"
+```
+
+You can check the tracked hand pose with:
+
+```bash
+ros2 run tf2_ros tf2_echo pelvis right_rubber_hand
+```
+
 #### Interactive Robot Control
 Command a desired base velocity and root link height via **Robot Base Controller GUI** and **XBox Controller Joystick**. For the joystick it is easiest to directly connect via USB. Otherwise you need to install the required bluetooth Xbox controller drivers on your linux system. The GUI application automatically scanns for Joysticks and indicates whether one is connected. 
 

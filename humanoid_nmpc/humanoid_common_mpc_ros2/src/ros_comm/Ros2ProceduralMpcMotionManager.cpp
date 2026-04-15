@@ -30,7 +30,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rclcpp/rclcpp.hpp>
 
+#include <functional>
 #include <mutex>
+#include <utility>
 
 #include "humanoid_common_mpc_ros2/ros_comm/Ros2ProceduralMpcMotionManager.h"
 
@@ -41,9 +43,11 @@ Ros2ProceduralMpcMotionManager::Ros2ProceduralMpcMotionManager(
     const std::string& referenceFile,
     std::shared_ptr<SwitchedModelReferenceManager> switchedModelReferenceManagerPtr,
     const MpcRobotModelBase<scalar_t>& mpcRobotModel,
-    VelocityTargetToTargetTrajectories velocityTargetToTargetTrajectories)
+    VelocityTargetToTargetTrajectories velocityTargetToTargetTrajectories,
+    std::string robotName)
     : ProceduralMpcMotionManager(
-          gaitFile, referenceFile, switchedModelReferenceManagerPtr, mpcRobotModel, velocityTargetToTargetTrajectories) {}
+          gaitFile, referenceFile, switchedModelReferenceManagerPtr, mpcRobotModel, velocityTargetToTargetTrajectories),
+      robotName_(std::move(robotName)) {}
 
 void Ros2ProceduralMpcMotionManager::setAndScaleVelocityCommand(const WalkingVelocityCommand& rawVelocityCommand) {
   std::lock_guard<std::mutex> lock(walkingVelCommandMutex_);
@@ -59,6 +63,21 @@ void Ros2ProceduralMpcMotionManager::subscribe(rclcpp::Node::SharedPtr nodeHandl
   };
   velCommandSubscriber_ = nodeHandle->create_subscription<humanoid_mpc_msgs::msg::WalkingVelocityCommand>(
       "humanoid/walking_velocity_command", qos, walkingVelocityCallback);
+
+  leftHandPoseSubscriber_ = nodeHandle->create_subscription<geometry_msgs::msg::PoseStamped>(
+      "/" + robotName_ + "/left_hand_pose_reference", qos,
+      [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) { this->setHandPoseReference("left_hand", *msg); });
+  rightHandPoseSubscriber_ = nodeHandle->create_subscription<geometry_msgs::msg::PoseStamped>(
+      "/" + robotName_ + "/right_hand_pose_reference", qos,
+      [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) { this->setHandPoseReference("right_hand", *msg); });
+}
+
+void Ros2ProceduralMpcMotionManager::setHandPoseReference(const std::string& referenceName, const geometry_msgs::msg::PoseStamped& msg) {
+  HandPoseReference reference;
+  reference.positionInPelvis << msg.pose.position.x, msg.pose.position.y, msg.pose.position.z;
+  reference.orientationPelvisToHand =
+      quaternion_t(msg.pose.orientation.w, msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z).normalized();
+  switchedModelReferenceManagerPtr_->getHandPoseReferenceManagerPtr()->setReference(referenceName, reference);
 }
 
 WalkingVelocityCommand Ros2ProceduralMpcMotionManager::getScaledWalkingVelocityCommand() {

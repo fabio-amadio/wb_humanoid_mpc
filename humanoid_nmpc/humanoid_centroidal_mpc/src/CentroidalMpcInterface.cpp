@@ -45,6 +45,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ocs2_core/soft_constraint/StateInputSoftConstraint.h>
 #include <ocs2_oc/synchronized_module/SolverSynchronizedModule.h>
 #include <ocs2_pinocchio_interface/PinocchioEndEffectorKinematicsCppAd.h>
+#include <ocs2_robotic_tools/common/RotationTransforms.h>
 
 #include <humanoid_common_mpc/HumanoidCostConstraintFactory.h>
 #include <humanoid_common_mpc/HumanoidPreComputation.h>
@@ -339,8 +340,32 @@ void CentroidalMpcInterface::addTaskSpaceKinematicsCosts(
     EndEffectorKinematicsWeights weights =
         EndEffectorKinematicsWeights::getWeights(taskFile_, "task_space_costs." + costName + ".weights.", verbose_);
 
+    bool usePelvisFrameReference = false;
+    loadData::loadPtreeValue(task_space_costs_pt, usePelvisFrameReference, costName + ".pelvis_frame_pose_reference", verbose_);
+
+    std::shared_ptr<HandPoseReferenceManager> handPoseReferenceManagerPtr = nullptr;
+    std::string handPoseReferenceName;
+    if (usePelvisFrameReference) {
+      const auto defaultCostElement =
+          EndEffectorKinematicsQuadraticCost::getReferenceCostElement(initialState_, vector_t::Zero(centroidalModelInfo_.inputDim),
+                                                                      *eeKinematicsPtr);
+      const vector6_t basePose = mpcRobotModelPtr_->getBasePose(initialState_);
+      const vector3_t baseEulerZyx = basePose.tail<3>();
+      const quaternion_t orientationBaseToWorld = getQuaternionFromEulerAnglesZyx(baseEulerZyx);
+
+      HandPoseReference defaultReference;
+      defaultReference.positionInPelvis = orientationBaseToWorld.inverse() * (defaultCostElement.getPosition() - basePose.head<3>());
+      defaultReference.orientationPelvisToHand = orientationBaseToWorld.inverse() * defaultCostElement.getOrientation();
+
+      handPoseReferenceManagerPtr = referenceManagerPtr_->getHandPoseReferenceManagerPtr();
+      handPoseReferenceName = costName;
+      handPoseReferenceManagerPtr->setReference(handPoseReferenceName, defaultReference);
+      std::cout << "Initialized pelvis-frame pose reference for task `" << handPoseReferenceName << "`" << std::endl;
+    }
+
     std::unique_ptr<StateInputCost> cost = std::make_unique<EndEffectorKinematicsQuadraticCost>(
-        weights, *pinocchioInterfacePtr_, *eeKinematicsPtr, *mpcRobotModelADPtr_, linkName, modelSettings_);
+        weights, *pinocchioInterfacePtr_, *eeKinematicsPtr, *mpcRobotModelPtr_, *mpcRobotModelADPtr_, linkName, modelSettings_,
+        handPoseReferenceManagerPtr, handPoseReferenceName);
 
     problemPtr_->costPtr->add(costName + "_TaskSpaceKinematicsCost", std::move(cost));
 

@@ -37,6 +37,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "humanoid_common_mpc/common/MpcRobotModelBase.h"
 #include "humanoid_common_mpc/gait/GaitSchedule.h"
 #include "humanoid_common_mpc/gait/MotionPhaseDefinition.h"
+#include "humanoid_common_mpc/reference_manager/HandPoseReferenceManager.h"
 #include "humanoid_common_mpc/swing_foot_planner/SwingTrajectoryPlanner.h"
 
 namespace ocs2::humanoid {
@@ -71,6 +72,8 @@ class SwitchedModelReferenceManager : public ReferenceManager {
 
   const std::shared_ptr<SwingTrajectoryPlanner>& getSwingTrajectoryPlanner() const { return swingTrajectoryPtr_; }
 
+  std::shared_ptr<HandPoseReferenceManager> getHandPoseReferenceManagerPtr() { return handPoseReferenceManagerPtr_; }
+
   scalar_t getPhaseVariable(scalar_t time) const;
 
   vector_t getDesiredState(const TargetTrajectories& targetTrajectories, const vector_t& state, scalar_t time) const;
@@ -95,6 +98,7 @@ class SwitchedModelReferenceManager : public ReferenceManager {
 
   std::shared_ptr<GaitSchedule> gaitSchedulePtr_;
   std::shared_ptr<SwingTrajectoryPlanner> swingTrajectoryPtr_;
+  std::shared_ptr<HandPoseReferenceManager> handPoseReferenceManagerPtr_{std::make_shared<HandPoseReferenceManager>()};
 };
 
 }  // namespace ocs2::humanoid

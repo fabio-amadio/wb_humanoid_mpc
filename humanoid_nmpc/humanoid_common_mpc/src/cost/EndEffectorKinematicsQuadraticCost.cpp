@@ -30,6 +30,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "humanoid_common_mpc/cost/EndEffectorKinematicsQuadraticCost.h"
 
+#include <utility>
+
+#include <ocs2_robotic_tools/common/RotationTransforms.h>
+
 namespace ocs2::humanoid {
 
 /******************************************************************************************************/
@@ -39,14 +43,20 @@ namespace ocs2::humanoid {
 EndEffectorKinematicsQuadraticCost::EndEffectorKinematicsQuadraticCost(EndEffectorKinematicsWeights weights,
                                                                        const PinocchioInterface& pinocchioInterface,
                                                                        const EndEffectorKinematics<scalar_t>& endEffectorKinematics,
+                                                                       const MpcRobotModelBase<scalar_t>& mpcRobotModel,
                                                                        const MpcRobotModelBase<ad_scalar_t>& mpcRobotModelAD,
                                                                        std::string endEffectorName,
-                                                                       const ModelSettings& modelSettings)
+                                                                       const ModelSettings& modelSettings,
+                                                                       std::shared_ptr<HandPoseReferenceManager> handPoseReferenceManagerPtr,
+                                                                       std::string handPoseReferenceName)
     : StateInputCostGaussNewtonAd(),
       sqrtWeights_(weights.toVector().cwiseSqrt()),
       endEffectorKinematicsPtr_(endEffectorKinematics.clone()),
       pinocchioInterfaceCppAd_(pinocchioInterface.toCppAd()),
-      mpcRobotModelADPtr(mpcRobotModelAD.clone()) {
+      mpcRobotModelPtr(mpcRobotModel.clone()),
+      mpcRobotModelADPtr(mpcRobotModelAD.clone()),
+      handPoseReferenceManagerPtr_(std::move(handPoseReferenceManagerPtr)),
+      handPoseReferenceName_(std::move(handPoseReferenceName)) {
   std::cout << "Initialized EndEffectorKinematicsQuadraticCost with weights: " << weights.toVector().transpose() << std::endl;
   std::cout << "Frame name: " << endEffectorName << std::endl;
   frameID_ = pinocchioInterface.getModel().getFrameId(endEffectorName);
@@ -71,7 +81,10 @@ EndEffectorKinematicsQuadraticCost::EndEffectorKinematicsQuadraticCost(const End
       frameID_(other.frameID_),
       pinocchioInterfaceCppAd_(other.pinocchioInterfaceCppAd_),
       endEffectorKinematicsPtr_(other.endEffectorKinematicsPtr_->clone()),
-      mpcRobotModelADPtr(other.mpcRobotModelADPtr->clone()) {}
+      mpcRobotModelPtr(other.mpcRobotModelPtr->clone()),
+      mpcRobotModelADPtr(other.mpcRobotModelADPtr->clone()),
+      handPoseReferenceManagerPtr_(other.handPoseReferenceManagerPtr_),
+      handPoseReferenceName_(other.handPoseReferenceName_) {}
 
 /******************************************************************************************************/
 /******************************************************************************************************/
@@ -84,8 +97,13 @@ vector_t EndEffectorKinematicsQuadraticCost::getParameters(scalar_t time,
   const vector_t xRef = targetTrajectories.getDesiredState(time);
   const vector_t uRef = targetTrajectories.getDesiredInput(time);
 
+  const auto handPoseReference = handPoseReferenceManagerPtr_ != nullptr ? handPoseReferenceManagerPtr_->getReference(handPoseReferenceName_)
+                                                                         : std::nullopt;
   vector_t parameters(n_parameters_);
-  parameters << getReferenceCostElement(xRef, uRef, *endEffectorKinematicsPtr_).getValues(), sqrtWeights_;
+  parameters << (handPoseReference.has_value() ? getExternalReferenceCostElement(xRef, uRef, *handPoseReference)
+                                               : getReferenceCostElement(xRef, uRef, *endEffectorKinematicsPtr_))
+                    .getValues(),
+      sqrtWeights_;
   return parameters;
 }
 
@@ -100,6 +118,23 @@ EndEffectorKinematicsCostElement<scalar_t> EndEffectorKinematicsQuadraticCost::g
   costElement.setOrientation(endEffectorKinematics.getOrientation(state)[0]);
   costElement.setLinearVelocity(endEffectorKinematics.getVelocity(state, input)[0]);
   costElement.setAngularVelocity(endEffectorKinematics.getAngularVelocity(state, input)[0]);
+  return costElement;
+}
+
+/******************************************************************************************************/
+/******************************************************************************************************/
+/******************************************************************************************************/
+
+EndEffectorKinematicsCostElement<scalar_t> EndEffectorKinematicsQuadraticCost::getExternalReferenceCostElement(
+    const vector_t& state, const vector_t& input, const HandPoseReference& pelvisFrameReference) const {
+  EndEffectorKinematicsCostElement<scalar_t> costElement = getReferenceCostElement(state, input, *endEffectorKinematicsPtr_);
+
+  const vector6_t basePose = mpcRobotModelPtr->getBasePose(state);
+  const vector3_t baseEulerZyx = basePose.tail<3>();
+  const quaternion_t orientationWorldToPelvis = getQuaternionFromEulerAnglesZyx(baseEulerZyx);
+  costElement.setPosition(basePose.head<3>() + orientationWorldToPelvis * pelvisFrameReference.positionInPelvis);
+  costElement.setOrientation(orientationWorldToPelvis * pelvisFrameReference.orientationPelvisToHand);
+
   return costElement;
 }
 

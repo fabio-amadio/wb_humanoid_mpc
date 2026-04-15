@@ -34,6 +34,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <mutex>
 
+#include "geometry_msgs/msg/pose_stamped.hpp"
 #include "humanoid_common_mpc/reference_manager/ProceduralMpcMotionManager.h"
 #include "humanoid_mpc_msgs/msg/walking_velocity_command.hpp"
 
@@ -48,7 +49,8 @@ class Ros2ProceduralMpcMotionManager : public ProceduralMpcMotionManager {
                                  const std::string& referenceFile,
                                  std::shared_ptr<SwitchedModelReferenceManager> switchedModelReferenceManagerPtr,
                                  const MpcRobotModelBase<scalar_t>& mpcRobotModel,
-                                 VelocityTargetToTargetTrajectories velocityTargetToTargetTrajectories);
+                                 VelocityTargetToTargetTrajectories velocityTargetToTargetTrajectories,
+                                 std::string robotName);
 
   ~Ros2ProceduralMpcMotionManager() override = default;
 
@@ -65,8 +67,13 @@ class Ros2ProceduralMpcMotionManager : public ProceduralMpcMotionManager {
  private:
   WalkingVelocityCommand getScaledWalkingVelocityCommand() override;
 
+  void setHandPoseReference(const std::string& referenceName, const geometry_msgs::msg::PoseStamped& msg);
+
   rclcpp::Subscription<humanoid_mpc_msgs::msg::WalkingVelocityCommand>::SharedPtr velCommandSubscriber_;
+  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr leftHandPoseSubscriber_;
+  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr rightHandPoseSubscriber_;
   std::mutex walkingVelCommandMutex_;
+  std::string robotName_;
 };
 
 }  // namespace ocs2::humanoid

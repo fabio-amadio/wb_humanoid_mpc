@@ -95,6 +95,7 @@ add_library(${PROJECT_NAME}
         src/swing_foot_planner/CubicSpline.cpp
         src/swing_foot_planner/SplineCpg.cpp
         src/swing_foot_planner/SwingTrajectoryPlanner.cpp
+        src/reference_manager/HandPoseReferenceManager.cpp
         src/reference_manager/SwitchedModelReferenceManager.cpp
         src/reference_manager/ProceduralMpcMotionManager.cpp
         src/HumanoidCostConstraintFactory.cpp
