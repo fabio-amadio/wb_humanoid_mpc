@@ -67,6 +67,7 @@ class ModelSettings {
   std::string modelFolderCppAd = "build/cppad_autocode_gen";
 
   scalar_t phaseTransitionStanceTime;
+  bool armSwingReferenceActive = true;
 
   // Fixed joints , add from the fullJointNames to consider them as fixed in the MPC
   std::vector<std::string> fullJointNames;

@@ -22,6 +22,7 @@ model_settings
   }
 
   phaseTransitionStanceTime         0.0
+  armSwingReferenceActive           true
 
   verboseCppAd                  true
   recompileLibrariesCppAd       false

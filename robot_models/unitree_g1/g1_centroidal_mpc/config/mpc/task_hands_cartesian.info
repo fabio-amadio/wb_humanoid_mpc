@@ -24,7 +24,7 @@ model_settings
   }
 
   phaseTransitionStanceTime       0.0
-  armSwingReferenceActive         true
+  armSwingReferenceActive         false
 
   verboseCppAd                  true
   recompileLibrariesCppAd       false
@@ -350,6 +350,54 @@ task_space_costs
       ang_velocity_x      5.0
       ang_velocity_y      5.0
       ang_velocity_z      2.0
+      lin_acceleration_x  0.0
+      lin_acceleration_y  0.0
+      lin_acceleration_z  0.0
+      ang_acceleration_x  0.0
+      ang_acceleration_y  0.0
+      ang_acceleration_z  0.0
+    }
+  }
+
+  left_hand {
+    link_name     left_rubber_hand
+    weights {
+      pos_x               25.0
+      pos_y               25.0
+      pos_z               25.0
+      orientation_x       0.0
+      orientation_y       0.0
+      orientation_z       0.0
+      lin_velocity_x      0.5
+      lin_velocity_y      0.5
+      lin_velocity_z      0.5
+      ang_velocity_x      0.0
+      ang_velocity_y      0.0
+      ang_velocity_z      0.0
+      lin_acceleration_x  0.0
+      lin_acceleration_y  0.0
+      lin_acceleration_z  0.0
+      ang_acceleration_x  0.0
+      ang_acceleration_y  0.0
+      ang_acceleration_z  0.0
+    }
+  }
+
+  right_hand {
+    link_name     right_rubber_hand
+    weights {
+      pos_x               25.0
+      pos_y               25.0
+      pos_z               25.0
+      orientation_x       0.0
+      orientation_y       0.0
+      orientation_z       0.0
+      lin_velocity_x      0.5
+      lin_velocity_y      0.5
+      lin_velocity_z      0.5
+      ang_velocity_x      0.0
+      ang_velocity_y      0.0
+      ang_velocity_z      0.0
       lin_acceleration_x  0.0
       lin_acceleration_y  0.0
       lin_acceleration_z  0.0

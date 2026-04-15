@@ -279,8 +279,8 @@ void HumanoidVisualizer::publishOptimizedStateTrajectory(const scalar_array_t& m
   // Create name of all visualized frame position by checking if each of the frame name from a list of full frame names exist in the model
   // This is required to run the visualization on a model that does not contain all the frames
   static std::vector<std::string> frameNames = [&]() {
-    std::vector<std::string> fullFrameNames = {"foot_l_contact", "foot_r_contact", "mid360_link", "left_hand_palm_joint",
-                                               "right_hand_palm_joint"};  // ToDo: generalize this
+    std::vector<std::string> fullFrameNames = {"foot_l_contact", "foot_r_contact", "mid360_link", "left_rubber_hand",
+                                               "right_rubber_hand"};  // ToDo: generalize this
     std::vector<std::string> frameNames;
     frameNames.reserve(2);  // Feet and should always be present
     for (std::string& frameName : fullFrameNames) {
