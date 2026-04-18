@@ -26,6 +26,7 @@ find_package(ocs2_mpc REQUIRED)
 find_package(ocs2_sqp REQUIRED)
 find_package(ocs2_robotic_tools REQUIRED)
 find_package(humanoid_centroidal_mpc REQUIRED)
+find_package(humanoid_common_mpc REQUIRED)
 find_package(humanoid_mpc_msgs REQUIRED)
 find_package(ocs2_centroidal_model REQUIRED)
 find_package(ocs2_pinocchio_interface REQUIRED)
@@ -84,6 +85,7 @@ set(dependencies
   ocs2_sqp
   ocs2_robotic_tools
   humanoid_centroidal_mpc
+  humanoid_common_mpc
   humanoid_mpc_msgs
   ocs2_centroidal_model
   ocs2_pinocchio_interface
@@ -166,6 +168,15 @@ ament_target_dependencies(humanoid_centroidal_mpc_motion_reference_node
 )
 target_compile_options(humanoid_centroidal_mpc_motion_reference_node PUBLIC ${FLAGS})
 
+# Headless random MPC reference generator
+add_executable(humanoid_centroidal_mpc_random_reference_generator
+  src/CentroidalMpcRandomReferenceGenerator.cpp
+)
+ament_target_dependencies(humanoid_centroidal_mpc_random_reference_generator
+  ${dependencies}
+)
+target_compile_options(humanoid_centroidal_mpc_random_reference_generator PUBLIC ${FLAGS})
+
 # Pose Command Node
 add_executable(humanoid_centroidal_mpc_pose_command_node
   src/CentroidalMpcKeyboardPoseCommandNode.cpp
@@ -217,6 +228,7 @@ install(TARGETS
   humanoid_centroidal_mpc_dummy_sim_node
   humanoid_centroidal_mpc_reference_joint_state_node
   humanoid_centroidal_mpc_motion_reference_node
+  humanoid_centroidal_mpc_random_reference_generator
   humanoid_centroidal_mpc_pose_command_node
   DESTINATION lib/${PROJECT_NAME}
 )

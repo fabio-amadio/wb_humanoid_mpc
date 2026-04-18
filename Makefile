@@ -205,6 +205,15 @@ launch-g1-dummy-sim-hands-cartesian-mpc-motion-reference:
 	source install/setup.bash && \
 	ros2 launch g1_centroidal_mpc dummy_sim_hands_cartesian.launch.py publish_mpc_motion_reference:=true
 
+generate-g1-random-mpc-npz:
+	cd ${build_dir} && \
+	source ${ros_source_file} && \
+	source install/setup.bash && \
+	ros2 run humanoid_centroidal_mpc_ros2 humanoid_centroidal_mpc_random_reference_generator \
+		--task-file /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task_random_reference.info \
+		--reference-file /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/command/reference_random_reference.info \
+		--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz
+
 launch-g1-sim:
 	cd ${build_dir} && \
 	source ${ros_source_file} && \

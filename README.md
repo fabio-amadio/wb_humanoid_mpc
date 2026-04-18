@@ -188,6 +188,28 @@ ros2 run humanoid_common_mpc_pyutils mpc_motion_reference_recorder \
 
 The resulting NPZ contains `joint_pos`, `joint_vel`, `body_pos_w`, `body_quat_w`, `body_lin_vel_w`, `body_ang_vel_w`, `body_names`, and `fps`. It will be available on the host at `/home/famadio/Workspace/wb_humanoid_mpc/g1_mpc_motion_reference.npz`.
 
+To generate a CLAMP-style NPZ directly from the centroidal SQP without ROS 2 topics, dummy sim, or visualization, run:
+
+```bash
+make generate-g1-random-mpc-npz
+```
+
+This writes `/wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz`, visible on the host at `/home/famadio/Workspace/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz`. The generator samples smooth random base velocity, pelvis height, yaw-rate, waist joints, and arm joints. For this generator, the wrist joints are kept in the MPC model, so the exported motion includes the full 29-DOF G1 joint set. The default random command ranges are `vx [-1.0, 1.8] m/s`, `vy [-1.0, 1.0] m/s`, `yaw_rate [-1.0, 1.0] rad/s`, and `height [0.4, 0.8] m`. With default probability `0.20`, a command segment is forced to stance with zero linear and angular base velocity. The waist targets are clamped to the `[-90, 90] deg` range and resampled every `3.0` to `9.0` seconds; the arm targets, including wrists, are resampled every `2.0` to `6.0` seconds. With default probability `0.20`, each waist/arm segment keeps the previous joint reference instead of drawing a new target; if this happens at `t=0`, it keeps the nominal `defaultJointState`. The gait is otherwise selected from the same procedural ladder used by the dummy example: `stance`, `slow_walk`, `walk`, `slower_trot`, `slow_trot`, `trot`, and `run`, using the same velocity thresholds. The gait timings are read from the existing `humanoid_common_mpc/config/command/gait.info`.
+
+You can also call the generator directly after sourcing the workspace:
+
+```bash
+ros2 run humanoid_centroidal_mpc_ros2 humanoid_centroidal_mpc_random_reference_generator \
+  --task-file /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task_random_reference.info \
+  --reference-file /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/command/reference_random_reference.info \
+  --output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz \
+  --duration 30.0 \
+  --fps 50.0 \
+  --seed 1 \
+  --stance-probability 0.20 \
+  --upper-body-fixed-probability 0.20
+```
+
 #### Interactive Robot Control
 Command a desired base velocity and root link height via **Robot Base Controller GUI** and **XBox Controller Joystick**. For the joystick it is easiest to directly connect via USB. Otherwise you need to install the required bluetooth Xbox controller drivers on your linux system. The GUI application automatically scanns for Joysticks and indicates whether one is connected. 
 
