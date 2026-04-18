@@ -159,6 +159,35 @@ You can check the tracked hand pose with:
 ros2 run tf2_ros tf2_echo pelvis right_rubber_hand
 ```
 
+To publish MPC references for a downstream CLAMP/RL WBC, launch the centroidal dummy sim with:
+
+```bash
+make launch-g1-dummy-sim-mpc-motion-reference
+```
+
+or, for the Cartesian hands variant:
+
+```bash
+make launch-g1-dummy-sim-hands-cartesian-mpc-motion-reference
+```
+
+This publishes `/g1/mpc_motion_reference`, containing the named joint position/velocity reference, root pose/twist in world, and the flattened CLAMP command layout:
+
+```text
+[joint_pos, joint_vel, base_vx_body, base_vy_body, base_yaw_rate_body, base_height, base_roll, base_pitch]
+```
+
+To record this stream as a CLAMP-compatible NPZ for offline policy playback, open a second terminal in the same Docker container and run:
+
+```bash
+ros2 run humanoid_common_mpc_pyutils mpc_motion_reference_recorder \
+  --topic /g1/mpc_motion_reference \
+  --output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/g1_mpc_motion_reference.npz \
+  --duration 10.0
+```
+
+The resulting NPZ contains `joint_pos`, `joint_vel`, `body_pos_w`, `body_quat_w`, `body_lin_vel_w`, `body_ang_vel_w`, `body_names`, and `fps`. It will be available on the host at `/home/famadio/Workspace/wb_humanoid_mpc/g1_mpc_motion_reference.npz`.
+
 #### Interactive Robot Control
 Command a desired base velocity and root link height via **Robot Base Controller GUI** and **XBox Controller Joystick**. For the joystick it is easiest to directly connect via USB. Otherwise you need to install the required bluetooth Xbox controller drivers on your linux system. The GUI application automatically scanns for Joysticks and indicates whether one is connected. 
 

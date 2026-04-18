@@ -31,8 +31,8 @@ import rclpy
 from rclpy.node import Node
 from ocs2_ros2_msgs.msg import MpcObservation
 from rclpy.qos import QoSProfile, ReliabilityPolicy
+import csv
 import numpy as np
-import pandas as pd
 from datetime import datetime
 
 
@@ -144,7 +144,7 @@ class MpcObservationLogger(Node):
             "qd_j_r_wrist_y",
             "time",
         ]
-        self.data_df = pd.DataFrame()
+        self.rows = []
 
     def listener_callback(self, msg):
         print(msg.time)
@@ -154,15 +154,17 @@ class MpcObservationLogger(Node):
         mpc_obs_arr = np.append(mpc_obs_arr, msg.input.value)
         mpc_obs_arr = np.append(mpc_obs_arr, np.zeros(7))
         mpc_obs_arr = np.append(mpc_obs_arr, msg.time)
-        new_df = pd.DataFrame(mpc_obs_arr.reshape(1, -1), columns=self.logger_cols)
-        self.data_df = pd.concat([self.data_df, new_df], ignore_index=True)
+        self.rows.append(mpc_obs_arr.tolist())
 
     def save_log(self):
         log_name = (
             "mpc_observation_" + datetime.now().strftime("%Y%m%d_%H%M%S") + ".csv"
         )
         print("Saving log:", log_name)
-        self.data_df.to_csv(log_name, index=False)
+        with open(log_name, "w", newline="") as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(self.logger_cols)
+            writer.writerows(self.rows)
         print("Done saving log")
 
 

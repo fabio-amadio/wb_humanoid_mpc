@@ -23,6 +23,7 @@ setup(
     entry_points={
         "console_scripts": [
             "mpc_observation_logger = humanoid_common_mpc_pyutils.mpc_observation_logger:main",
+            "mpc_motion_reference_recorder = humanoid_common_mpc_pyutils.mpc_motion_reference_recorder:main",
         ],
     },
 )

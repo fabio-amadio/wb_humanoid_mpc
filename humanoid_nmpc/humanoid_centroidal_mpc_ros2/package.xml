@@ -27,6 +27,7 @@
   <depend>ocs2_sqp</depend>
   <depend>ocs2_robotic_tools</depend>
   <depend>humanoid_centroidal_mpc</depend>
+  <depend>humanoid_mpc_msgs</depend>
   <depend>humanoid_common_mpc_ros2</depend>
   <depend>ocs2_centroidal_model</depend>
   <depend>ocs2_pinocchio_interface</depend>

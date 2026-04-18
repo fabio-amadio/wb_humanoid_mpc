@@ -50,10 +50,33 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("publish_reference_joint_states")),
     )
 
+    cfg.ld.add_action(
+        DeclareLaunchArgument(
+            "publish_mpc_motion_reference",
+            default_value="false",
+            description="Publish MPC references in the CLAMP motion command layout.",
+        )
+    )
+
+    mpc_motion_reference_publisher_node = Node(
+        package="humanoid_centroidal_mpc_ros2",
+        executable="humanoid_centroidal_mpc_motion_reference_node",
+        name="mpc_motion_reference_publisher",
+        output="screen",
+        arguments=[
+            LaunchConfiguration("robot_name"),
+            LaunchConfiguration("config_name"),
+            LaunchConfiguration("target_command_file"),
+            LaunchConfiguration("description_name"),
+        ],
+        condition=IfCondition(LaunchConfiguration("publish_mpc_motion_reference")),
+    )
+
     # Add nodes
     cfg.ld.add_action(cfg.mpc_node)
     cfg.ld.add_action(cfg.dummy_sim_node)
     cfg.ld.add_action(reference_joint_state_publisher_node)
+    cfg.ld.add_action(mpc_motion_reference_publisher_node)
     cfg.ld.add_action(cfg.robot_state_publisher_node)
     cfg.ld.add_action(cfg.terminal_robot_state_publisher_node)
     cfg.ld.add_action(cfg.target_robot_state_publisher_node)
