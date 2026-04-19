@@ -30,6 +30,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <ament_index_cpp/get_package_share_directory.hpp>
 
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include <pinocchio/algorithm/frames.hpp>
 #include <pinocchio/algorithm/kinematics.hpp>
 
@@ -49,6 +52,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <algorithm>
 #include <array>
+#include <cerrno>
 #include <cmath>
 #include <cstdlib>
 #include <cstdint>
@@ -67,6 +71,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <vector>
 
 #include <Eigen/Geometry>
+#include <zlib.h>
 
 using namespace ocs2;
 using namespace ocs2::humanoid;
@@ -114,9 +119,11 @@ struct Options {
   std::string urdfFile;
   std::string gaitFile;
   std::string output = "/wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz";
-  scalar_t duration = 30.0;
-  scalar_t fps = 50.0;
+  scalar_t duration = 20.0;
+  scalar_t fps = 30.0;
   uint32_t seed = 1;
+  size_t numMotions = 1;
+  size_t maxAttemptsPerMotion = 20;
   scalar_t vxMin = -1.0;
   scalar_t vxMax = 1.8;
   scalar_t vyMin = -1.0;
@@ -125,15 +132,21 @@ struct Options {
   scalar_t yawRateMax = 1.0;
   scalar_t heightMin = 0.4;
   scalar_t heightMax = 0.8;
-  scalar_t commandSegmentMin = 3.0;
-  scalar_t commandSegmentMax = 9.0;
-  scalar_t waistSegmentMin = 3.0;
-  scalar_t waistSegmentMax = 9.0;
+  scalar_t cmdVelSegmentMin = 3.0;
+  scalar_t cmdVelSegmentMax = 9.0;
+  scalar_t waistSegmentMin = 1.5;
+  scalar_t waistSegmentMax = 4.5;
   scalar_t armSegmentMin = 2.0;
   scalar_t armSegmentMax = 6.0;
+  scalar_t wristSegmentMin = 1.5;
+  scalar_t wristSegmentMax = 4.5;
   scalar_t armLimitMargin = 0.05;
-  scalar_t stanceProbability = 0.20;
-  scalar_t upperBodyFixedProbability = 0.20;
+  scalar_t stanceProbability = 0.2;
+  scalar_t headingProbability = 0.5;
+  scalar_t headingMin = -kPi;
+  scalar_t headingMax = kPi;
+  scalar_t headingControlStiffness = 1.0;
+  scalar_t upperBodyFixedProbability = 0.2;
 };
 
 struct SmoothScalarTrajectory {
@@ -176,6 +189,24 @@ struct StanceSchedule {
   }
 };
 
+struct HeadingSchedule {
+  std::vector<scalar_t> times;
+  std::vector<bool> active;
+  std::vector<scalar_t> targets;
+
+  std::pair<bool, scalar_t> value(scalar_t time) const {
+    if (times.empty()) {
+      return {false, 0.0};
+    }
+    const auto upper = std::upper_bound(times.begin(), times.end(), time);
+    size_t index = 0;
+    if (upper != times.begin()) {
+      index = static_cast<size_t>(std::distance(times.begin(), upper) - 1);
+    }
+    return {active[index], targets[index]};
+  }
+};
+
 struct MotionBuffers {
   std::vector<float> jointPos;
   std::vector<float> jointVel;
@@ -192,6 +223,7 @@ struct MotionBuffers {
 struct ZipEntry {
   std::string filename;
   std::vector<uint8_t> payload;
+  std::vector<uint8_t> compressedPayload;
   uint32_t crc = 0;
   uint32_t offset = 0;
 };
@@ -206,6 +238,34 @@ uint32_t crc32(const uint8_t* data, size_t length) {
     }
   }
   return ~crc;
+}
+
+std::vector<uint8_t> deflateRaw(const std::vector<uint8_t>& input) {
+  if (input.empty()) {
+    return {};
+  }
+
+  z_stream stream{};
+  const int initResult = deflateInit2(&stream, Z_BEST_SPEED, Z_DEFLATED, -MAX_WBITS, 8, Z_DEFAULT_STRATEGY);
+  if (initResult != Z_OK) {
+    throw std::runtime_error("Failed to initialize zlib deflate stream.");
+  }
+
+  std::vector<uint8_t> output(deflateBound(&stream, static_cast<uLong>(input.size())));
+  stream.next_in = const_cast<Bytef*>(reinterpret_cast<const Bytef*>(input.data()));
+  stream.avail_in = static_cast<uInt>(input.size());
+  stream.next_out = reinterpret_cast<Bytef*>(output.data());
+  stream.avail_out = static_cast<uInt>(output.size());
+
+  const int deflateResult = deflate(&stream, Z_FINISH);
+  if (deflateResult != Z_STREAM_END) {
+    deflateEnd(&stream);
+    throw std::runtime_error("Failed to deflate NPZ entry.");
+  }
+
+  output.resize(stream.total_out);
+  deflateEnd(&stream);
+  return output;
 }
 
 void appendU16(std::vector<uint8_t>& out, uint16_t value) {
@@ -282,21 +342,22 @@ void writeZip(const std::filesystem::path& path, std::vector<ZipEntry> entries) 
   std::vector<uint8_t> out;
   for (auto& entry : entries) {
     entry.crc = crc32(entry.payload.data(), entry.payload.size());
+    entry.compressedPayload = deflateRaw(entry.payload);
     entry.offset = static_cast<uint32_t>(out.size());
 
     appendU32(out, 0x04034b50u);
     appendU16(out, 20);
     appendU16(out, 0);
-    appendU16(out, 0);
+    appendU16(out, 8);
     appendU16(out, 0);
     appendU16(out, 0);
     appendU32(out, entry.crc);
-    appendU32(out, static_cast<uint32_t>(entry.payload.size()));
+    appendU32(out, static_cast<uint32_t>(entry.compressedPayload.size()));
     appendU32(out, static_cast<uint32_t>(entry.payload.size()));
     appendU16(out, static_cast<uint16_t>(entry.filename.size()));
     appendU16(out, 0);
     out.insert(out.end(), entry.filename.begin(), entry.filename.end());
-    out.insert(out.end(), entry.payload.begin(), entry.payload.end());
+    out.insert(out.end(), entry.compressedPayload.begin(), entry.compressedPayload.end());
   }
 
   const uint32_t centralDirectoryOffset = static_cast<uint32_t>(out.size());
@@ -305,11 +366,11 @@ void writeZip(const std::filesystem::path& path, std::vector<ZipEntry> entries) 
     appendU16(out, 20);
     appendU16(out, 20);
     appendU16(out, 0);
-    appendU16(out, 0);
+    appendU16(out, 8);
     appendU16(out, 0);
     appendU16(out, 0);
     appendU32(out, entry.crc);
-    appendU32(out, static_cast<uint32_t>(entry.payload.size()));
+    appendU32(out, static_cast<uint32_t>(entry.compressedPayload.size()));
     appendU32(out, static_cast<uint32_t>(entry.payload.size()));
     appendU16(out, static_cast<uint16_t>(entry.filename.size()));
     appendU16(out, 0);
@@ -345,6 +406,15 @@ void saveClampNpz(const std::filesystem::path& path,
                   const MotionBuffers& buffers,
                   const std::vector<std::string>& jointNames,
                   const std::vector<std::string>& bodyNames) {
+  const size_t expectedJointScalars = buffers.numFrames * buffers.numJoints;
+  const size_t expectedBodyPositionScalars = buffers.numFrames * buffers.numBodies * 3;
+  const size_t expectedBodyQuaternionScalars = buffers.numFrames * buffers.numBodies * 4;
+  if (buffers.jointPos.size() != expectedJointScalars || buffers.jointVel.size() != expectedJointScalars ||
+      buffers.bodyPos.size() != expectedBodyPositionScalars || buffers.bodyLinVel.size() != expectedBodyPositionScalars ||
+      buffers.bodyAngVel.size() != expectedBodyPositionScalars || buffers.bodyQuat.size() != expectedBodyQuaternionScalars) {
+    throw std::runtime_error("Motion buffer sizes do not match the requested NPZ shapes.");
+  }
+
   std::vector<ZipEntry> entries;
   entries.push_back({"joint_pos.npy", makeNumericNpy(buffers.jointPos, "<f4", {buffers.numFrames, buffers.numJoints})});
   entries.push_back({"joint_vel.npy", makeNumericNpy(buffers.jointVel, "<f4", {buffers.numFrames, buffers.numJoints})});
@@ -372,6 +442,18 @@ scalar_t parseScalar(const std::string& text, const std::string& option) {
     return std::stod(text);
   } catch (const std::exception&) {
     throw std::runtime_error("Invalid scalar value for " + option + ": " + text);
+  }
+}
+
+void requireOrderedRange(scalar_t lower, scalar_t upper, const std::string& name) {
+  if (!std::isfinite(lower) || !std::isfinite(upper) || lower > upper) {
+    throw std::runtime_error(name + " must be finite with min <= max.");
+  }
+}
+
+void requirePositiveSegmentRange(scalar_t lower, scalar_t upper, const std::string& name) {
+  if (!std::isfinite(lower) || !std::isfinite(upper) || lower <= 0.0 || upper <= 0.0 || lower > upper) {
+    throw std::runtime_error(name + " must be finite, positive, and min <= max.");
   }
 }
 
@@ -404,6 +486,10 @@ Options parseOptions(int argc, char** argv) {
       options.fps = parseScalar(requireValue(i, argc, argv), arg);
     } else if (arg == "--seed") {
       options.seed = static_cast<uint32_t>(std::stoul(requireValue(i, argc, argv)));
+    } else if (arg == "--num-motions" || arg == "--motions") {
+      options.numMotions = static_cast<size_t>(std::stoul(requireValue(i, argc, argv)));
+    } else if (arg == "--max-attempts-per-motion") {
+      options.maxAttemptsPerMotion = static_cast<size_t>(std::stoul(requireValue(i, argc, argv)));
     } else if (arg == "--vx-min") {
       options.vxMin = parseScalar(requireValue(i, argc, argv), arg);
     } else if (arg == "--vx-max") {
@@ -420,15 +506,35 @@ Options parseOptions(int argc, char** argv) {
       options.heightMin = parseScalar(requireValue(i, argc, argv), arg);
     } else if (arg == "--height-max") {
       options.heightMax = parseScalar(requireValue(i, argc, argv), arg);
+    } else if (arg == "--cmd-vel-segment-min") {
+      options.cmdVelSegmentMin = parseScalar(requireValue(i, argc, argv), arg);
+    } else if (arg == "--cmd-vel-segment-max") {
+      options.cmdVelSegmentMax = parseScalar(requireValue(i, argc, argv), arg);
     } else if (arg == "--stance-probability") {
       options.stanceProbability = parseScalar(requireValue(i, argc, argv), arg);
+    } else if (arg == "--heading-prob" || arg == "--heading-probability" || arg == "--heading_prob") {
+      options.headingProbability = parseScalar(requireValue(i, argc, argv), arg);
+    } else if (arg == "--heading-min") {
+      options.headingMin = parseScalar(requireValue(i, argc, argv), arg);
+    } else if (arg == "--heading-max") {
+      options.headingMax = parseScalar(requireValue(i, argc, argv), arg);
+    } else if (arg == "--heading-control-stiffness") {
+      options.headingControlStiffness = parseScalar(requireValue(i, argc, argv), arg);
     } else if (arg == "--upper-body-fixed-probability") {
       options.upperBodyFixedProbability = parseScalar(requireValue(i, argc, argv), arg);
+    } else if (arg == "--wrist-segment-min") {
+      options.wristSegmentMin = parseScalar(requireValue(i, argc, argv), arg);
+    } else if (arg == "--wrist-segment-max") {
+      options.wristSegmentMax = parseScalar(requireValue(i, argc, argv), arg);
     } else if (arg == "--help" || arg == "-h") {
-      std::cout << "Usage: " << argv[0] << " [--output PATH] [--duration SEC] [--fps HZ] [--seed N]\n"
+      std::cout << "Usage: " << argv[0] << " [--output PATH] [--duration SEC] [--fps HZ] [--seed N] [--num-motions N]\n"
+                << "       [--max-attempts-per-motion N]\n"
                 << "       [--vx-min V] [--vx-max V] [--vy-min V] [--vy-max V]\n"
                 << "       [--yaw-rate-min V] [--yaw-rate-max V] [--height-min H] [--height-max H]\n"
-                << "       [--stance-probability P] [--upper-body-fixed-probability P]\n"
+                << "       [--cmd-vel-segment-min SEC] [--cmd-vel-segment-max SEC]\n"
+                << "       [--stance-probability P] [--heading-prob P] [--upper-body-fixed-probability P]\n"
+                << "       [--heading-min RAD] [--heading-max RAD] [--heading-control-stiffness K]\n"
+                << "       [--wrist-segment-min SEC] [--wrist-segment-max SEC]\n"
                 << "       [--task-file PATH] [--reference-file PATH] [--urdf-file PATH] [--gait-file PATH]\n";
       std::exit(0);
     } else {
@@ -442,13 +548,55 @@ Options parseOptions(int argc, char** argv) {
   if (options.fps <= 0.0) {
     throw std::runtime_error("--fps must be positive.");
   }
+  if (options.numMotions == 0) {
+    throw std::runtime_error("--num-motions must be positive.");
+  }
+  if (options.maxAttemptsPerMotion == 0) {
+    throw std::runtime_error("--max-attempts-per-motion must be positive.");
+  }
   if (options.upperBodyFixedProbability < 0.0 || options.upperBodyFixedProbability > 1.0) {
     throw std::runtime_error("--upper-body-fixed-probability must be in [0, 1].");
   }
   if (options.stanceProbability < 0.0 || options.stanceProbability > 1.0) {
     throw std::runtime_error("--stance-probability must be in [0, 1].");
   }
+  if (options.headingProbability < 0.0 || options.headingProbability > 1.0) {
+    throw std::runtime_error("--heading-prob must be in [0, 1].");
+  }
+  if (options.headingControlStiffness < 0.0) {
+    throw std::runtime_error("--heading-control-stiffness must be non-negative.");
+  }
+  requireOrderedRange(options.vxMin, options.vxMax, "--vx-min/max");
+  requireOrderedRange(options.vyMin, options.vyMax, "--vy-min/max");
+  requireOrderedRange(options.yawRateMin, options.yawRateMax, "--yaw-rate-min/max");
+  requireOrderedRange(options.headingMin, options.headingMax, "--heading-min/max");
+  requireOrderedRange(options.heightMin, options.heightMax, "--height-min/max");
+  requirePositiveSegmentRange(options.cmdVelSegmentMin, options.cmdVelSegmentMax, "--cmd-vel-segment-min/max");
+  requirePositiveSegmentRange(options.waistSegmentMin, options.waistSegmentMax, "--waist-segment-min/max");
+  requirePositiveSegmentRange(options.armSegmentMin, options.armSegmentMax, "--arm-segment-min/max");
+  requirePositiveSegmentRange(options.wristSegmentMin, options.wristSegmentMax, "--wrist-segment-min/max");
   return options;
+}
+
+std::filesystem::path outputPathForMotion(const std::filesystem::path& requestedOutput, size_t motionIndex, size_t numMotions) {
+  if (numMotions == 1) {
+    return requestedOutput;
+  }
+
+  std::ostringstream suffix;
+  suffix << "_" << std::setw(4) << std::setfill('0') << motionIndex;
+
+  if (requestedOutput.has_extension()) {
+    return requestedOutput.parent_path() / (requestedOutput.stem().string() + suffix.str() + requestedOutput.extension().string());
+  }
+
+  return requestedOutput / ("g1_random_mpc_reference" + suffix.str() + ".npz");
+}
+
+std::filesystem::path temporaryOutputPathForAttempt(const std::filesystem::path& outputPath, size_t attemptIndex) {
+  std::ostringstream suffix;
+  suffix << ".attempt_" << std::setw(3) << std::setfill('0') << attemptIndex << ".tmp";
+  return outputPath.parent_path() / (outputPath.filename().string() + suffix.str());
 }
 
 SmoothScalarTrajectory makeRandomSmoothTrajectory(scalar_t duration,
@@ -497,6 +645,64 @@ StanceSchedule makeRandomStanceSchedule(scalar_t duration,
   return schedule;
 }
 
+HeadingSchedule makeRandomHeadingSchedule(scalar_t duration,
+                                          scalar_t segmentMin,
+                                          scalar_t segmentMax,
+                                          scalar_t headingProbability,
+                                          scalar_t headingMin,
+                                          scalar_t headingMax,
+                                          std::mt19937& rng) {
+  std::uniform_real_distribution<scalar_t> segmentDist(segmentMin, segmentMax);
+  std::uniform_real_distribution<scalar_t> targetDist(headingMin, headingMax);
+  std::bernoulli_distribution headingDist(std::clamp(headingProbability, scalar_t(0.0), scalar_t(1.0)));
+
+  HeadingSchedule schedule;
+  schedule.times.push_back(0.0);
+  schedule.active.push_back(headingDist(rng));
+  schedule.targets.push_back(targetDist(rng));
+
+  scalar_t time = 0.0;
+  while (time < duration) {
+    time = std::min(duration, time + segmentDist(rng));
+    schedule.times.push_back(time);
+    schedule.active.push_back(headingDist(rng));
+    schedule.targets.push_back(targetDist(rng));
+  }
+  return schedule;
+}
+
+scalar_t wrapToPi(scalar_t angle) {
+  while (angle > kPi) {
+    angle -= 2.0 * kPi;
+  }
+  while (angle < -kPi) {
+    angle += 2.0 * kPi;
+  }
+  return angle;
+}
+
+void throwIfNotFinite(const vector_t& vector, const std::string& name, size_t motionIndex, size_t frame, scalar_t time) {
+  if (!vector.allFinite()) {
+    std::ostringstream ss;
+    ss << "Non-finite " << name << " at motion " << motionIndex << ", frame " << frame << ", t=" << time;
+    throw std::runtime_error(ss.str());
+  }
+}
+
+void throwIfUnexpectedSize(const vector_t& vector,
+                           Eigen::Index expectedSize,
+                           const std::string& name,
+                           size_t motionIndex,
+                           size_t frame,
+                           scalar_t time) {
+  if (vector.size() != expectedSize) {
+    std::ostringstream ss;
+    ss << "Unexpected " << name << " size at motion " << motionIndex << ", frame " << frame << ", t=" << time << ": got "
+       << vector.size() << ", expected " << expectedSize;
+    throw std::runtime_error(ss.str());
+  }
+}
+
 bool isWaistJoint(const std::string& jointName) {
   return jointName.find("waist") != std::string::npos;
 }
@@ -504,6 +710,10 @@ bool isWaistJoint(const std::string& jointName) {
 bool isArmJoint(const std::string& jointName) {
   return jointName.find("shoulder") != std::string::npos || jointName.find("elbow") != std::string::npos ||
          jointName.find("wrist") != std::string::npos;
+}
+
+bool isWristJoint(const std::string& jointName) {
+  return jointName.find("wrist") != std::string::npos;
 }
 
 std::vector<size_t> getRandomizedMpcJointIndices(const ModelSettings& modelSettings) {
@@ -626,18 +836,11 @@ void fillFiniteDifferenceBodyVelocities(MotionBuffers& buffers, scalar_t dt) {
   std::copy_n(buffers.bodyAngVel.begin() + prevOffset, nBodies * 3, buffers.bodyAngVel.begin() + lastOffset);
 }
 
-}  // namespace
+void generateMotion(const Options& options, const std::filesystem::path& outputPath, uint32_t seed, size_t motionIndex) {
+  std::cout << "[random_mpc_generator] motion " << motionIndex << " seed: " << seed << "\n";
+  std::cout << "[random_mpc_generator] motion " << motionIndex << " output: " << outputPath.string() << "\n";
 
-int main(int argc, char** argv) {
-  const Options options = parseOptions(argc, argv);
-
-  std::cout << "[random_mpc_generator] task file: " << options.taskFile << "\n";
-  std::cout << "[random_mpc_generator] reference file: " << options.referenceFile << "\n";
-  std::cout << "[random_mpc_generator] urdf file: " << options.urdfFile << "\n";
-  std::cout << "[random_mpc_generator] gait file: " << options.gaitFile << "\n";
-  std::cout << "[random_mpc_generator] output: " << options.output << "\n";
-
-  std::mt19937 rng(options.seed);
+  std::mt19937 rng(seed);
 
   CentroidalMpcInterface interface(options.taskFile, options.urdfFile, options.referenceFile, true);
   interface.getSwitchedModelReferenceManagerPtr()->setArmSwingReferenceActive(false);
@@ -673,6 +876,9 @@ int main(int argc, char** argv) {
       upper = std::min(upper, M_PI / 2.0);
       segmentMin = options.waistSegmentMin;
       segmentMax = options.waistSegmentMax;
+    } else if (isWristJoint(jointName)) {
+      segmentMin = options.wristSegmentMin;
+      segmentMax = options.wristSegmentMax;
     }
     jointTrajectories.emplace(mpcJointIndex,
                               makeRandomSmoothTrajectory(options.duration, segmentMin, segmentMax, lower, upper,
@@ -683,17 +889,19 @@ int main(int argc, char** argv) {
   }
 
   const auto vxTrajectory =
-      makeRandomSmoothTrajectory(options.duration, options.commandSegmentMin, options.commandSegmentMax, options.vxMin, options.vxMax, 0.0, 0.0,
+      makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax, options.vxMin, options.vxMax, 0.0, 0.0,
                                  rng);
   const auto vyTrajectory =
-      makeRandomSmoothTrajectory(options.duration, options.commandSegmentMin, options.commandSegmentMax, options.vyMin, options.vyMax, 0.0, 0.0,
+      makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax, options.vyMin, options.vyMax, 0.0, 0.0,
                                  rng);
-  const auto yawRateTrajectory = makeRandomSmoothTrajectory(options.duration, options.commandSegmentMin, options.commandSegmentMax,
+  const auto yawRateTrajectory = makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
                                                            options.yawRateMin, options.yawRateMax, 0.0, 0.0, rng);
-  const auto heightTrajectory = makeRandomSmoothTrajectory(options.duration, options.commandSegmentMin, options.commandSegmentMax,
+  const auto heightTrajectory = makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
                                                           options.heightMin, options.heightMax, defaultBaseHeight, 0.0, rng);
-  const auto stanceSchedule = makeRandomStanceSchedule(options.duration, options.commandSegmentMin, options.commandSegmentMax,
+  const auto stanceSchedule = makeRandomStanceSchedule(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
                                                        options.stanceProbability, rng);
+  const auto headingSchedule = makeRandomHeadingSchedule(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
+                                                         options.headingProbability, options.headingMin, options.headingMax, rng);
 
   const auto gaitMap = getGaitMap(options.gaitFile);
   const std::vector<ProceduralMpcMotionManager::GaitModeStateConfig> gaitModeStates{
@@ -784,6 +992,13 @@ int main(int argc, char** argv) {
       velocityTarget[3] = 0.0;
     }
     vector4_t filteredVelCommand = velocityCommandFilter.getFilteredVector(velocityTarget);
+    const auto [useHeading, headingTarget] = headingSchedule.value(time);
+    if (!forceStance && useHeading) {
+      // Base pose layout is [x, y, z, yaw, pitch, roll].
+      const scalar_t baseYaw = mpcRobotModel.getBasePose(observation.state)[3];
+      const scalar_t yawRate = options.headingControlStiffness * wrapToPi(headingTarget - baseYaw);
+      filteredVelCommand[3] = std::clamp(yawRate, options.yawRateMin, options.yawRateMax);
+    }
     if (forceStance) {
       filteredVelCommand[0] = 0.0;
       filteredVelCommand[1] = 0.0;
@@ -837,6 +1052,10 @@ int main(int argc, char** argv) {
     vector_t nextInput;
     size_t nextMode = observation.mode;
     mrt.rolloutPolicy(time, observation.state, dt, nextState, nextInput, nextMode);
+    throwIfUnexpectedSize(nextState, observation.state.size(), "rollout state", motionIndex, frame, time);
+    throwIfUnexpectedSize(nextInput, observation.input.size(), "rollout input", motionIndex, frame, time);
+    throwIfNotFinite(nextState, "rollout state", motionIndex, frame, time);
+    throwIfNotFinite(nextInput, "rollout input", motionIndex, frame, time);
 
     observation.time = time + dt;
     observation.state = std::move(nextState);
@@ -858,8 +1077,97 @@ int main(int argc, char** argv) {
   }
 
   fillFiniteDifferenceBodyVelocities(buffers, dt);
-  saveClampNpz(options.output, buffers, toStringVector(modelSettings.fullJointNames), bodyNames);
+  saveClampNpz(outputPath, buffers, toStringVector(modelSettings.fullJointNames), bodyNames);
 
-  std::cout << "[random_mpc_generator] saved " << buffers.numFrames << " frames to " << options.output << "\n";
+  std::cout << "[random_mpc_generator] saved " << buffers.numFrames << " frames to " << outputPath.string() << "\n";
+}
+
+int runGenerationAttempt(const Options& options, const std::filesystem::path& outputPath, uint32_t seed, size_t motionIndex) {
+  std::cout.flush();
+  std::cerr.flush();
+
+  const pid_t pid = fork();
+  if (pid < 0) {
+    throw std::runtime_error("Failed to fork a random MPC generation attempt.");
+  }
+
+  if (pid == 0) {
+    try {
+      generateMotion(options, outputPath, seed, motionIndex);
+      std::cout.flush();
+      std::cerr.flush();
+      std::_Exit(EXIT_SUCCESS);
+    } catch (const std::exception& e) {
+      std::cerr << "[random_mpc_generator] child attempt failed with seed " << seed << ": " << e.what() << "\n";
+      std::cout.flush();
+      std::cerr.flush();
+      std::_Exit(EXIT_FAILURE);
+    } catch (...) {
+      std::cerr << "[random_mpc_generator] child attempt failed with seed " << seed << ": unknown exception\n";
+      std::cout.flush();
+      std::cerr.flush();
+      std::_Exit(EXIT_FAILURE);
+    }
+  }
+
+  int status = 0;
+  while (waitpid(pid, &status, 0) == -1) {
+    if (errno == EINTR) {
+      continue;
+    }
+    throw std::runtime_error("Failed while waiting for a random MPC generation attempt.");
+  }
+  return status;
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  const Options options = parseOptions(argc, argv);
+
+  std::cout << "[random_mpc_generator] task file: " << options.taskFile << "\n";
+  std::cout << "[random_mpc_generator] reference file: " << options.referenceFile << "\n";
+  std::cout << "[random_mpc_generator] urdf file: " << options.urdfFile << "\n";
+  std::cout << "[random_mpc_generator] gait file: " << options.gaitFile << "\n";
+  std::cout << "[random_mpc_generator] output: " << options.output << "\n";
+  std::cout << "[random_mpc_generator] num motions: " << options.numMotions << "\n";
+  std::cout << "[random_mpc_generator] max attempts per motion: " << options.maxAttemptsPerMotion << "\n";
+
+  for (size_t motionIndex = 0; motionIndex < options.numMotions; ++motionIndex) {
+    const auto outputPath = outputPathForMotion(options.output, motionIndex, options.numMotions);
+    bool generated = false;
+    for (size_t attemptIndex = 0; attemptIndex < options.maxAttemptsPerMotion; ++attemptIndex) {
+      const uint32_t attemptSeed =
+          options.seed + static_cast<uint32_t>(motionIndex * options.maxAttemptsPerMotion + attemptIndex);
+      const auto temporaryOutputPath = temporaryOutputPathForAttempt(outputPath, attemptIndex);
+      std::filesystem::remove(temporaryOutputPath);
+
+      const int attemptStatus = runGenerationAttempt(options, temporaryOutputPath, attemptSeed, motionIndex);
+      if (WIFEXITED(attemptStatus) && WEXITSTATUS(attemptStatus) == EXIT_SUCCESS) {
+        std::filesystem::remove(outputPath);
+        std::filesystem::rename(temporaryOutputPath, outputPath);
+        std::cout << "[random_mpc_generator] motion " << motionIndex << " accepted after attempt " << (attemptIndex + 1)
+                  << "/" << options.maxAttemptsPerMotion << ": " << outputPath.string() << "\n";
+        generated = true;
+        break;
+      } else {
+        std::filesystem::remove(temporaryOutputPath);
+        std::cerr << "[random_mpc_generator] motion " << motionIndex << " attempt " << (attemptIndex + 1) << "/"
+                  << options.maxAttemptsPerMotion << " failed with seed " << attemptSeed;
+        if (WIFSIGNALED(attemptStatus)) {
+          std::cerr << " due to signal " << WTERMSIG(attemptStatus);
+        } else if (WIFEXITED(attemptStatus)) {
+          std::cerr << " with exit code " << WEXITSTATUS(attemptStatus);
+        }
+        std::cerr << "\n";
+      }
+    }
+
+    if (!generated) {
+      std::ostringstream ss;
+      ss << "Failed to generate motion " << motionIndex << " after " << options.maxAttemptsPerMotion << " attempts.";
+      throw std::runtime_error(ss.str());
+    }
+  }
   return 0;
 }

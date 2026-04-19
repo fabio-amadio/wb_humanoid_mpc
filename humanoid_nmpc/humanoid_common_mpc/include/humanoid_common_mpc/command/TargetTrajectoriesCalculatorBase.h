@@ -102,6 +102,7 @@ class TargetTrajectoriesCalculatorBase {
 
   scalar_t defaultBaseHeight_;
   vector_t targetJointState_;
+  mutable vector4_t commVelFiltered_ = vector4_t::Zero();
   scalar_t mpcHorizon_;
 };
 

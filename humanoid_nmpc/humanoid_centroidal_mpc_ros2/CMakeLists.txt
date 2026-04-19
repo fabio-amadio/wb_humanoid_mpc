@@ -50,6 +50,7 @@ find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(glfw3 REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(absl REQUIRED)
+find_package(ZLIB REQUIRED)
 
 
 ###########
@@ -174,6 +175,9 @@ add_executable(humanoid_centroidal_mpc_random_reference_generator
 )
 ament_target_dependencies(humanoid_centroidal_mpc_random_reference_generator
   ${dependencies}
+)
+target_link_libraries(humanoid_centroidal_mpc_random_reference_generator
+  ZLIB::ZLIB
 )
 target_compile_options(humanoid_centroidal_mpc_random_reference_generator PUBLIC ${FLAGS})
 

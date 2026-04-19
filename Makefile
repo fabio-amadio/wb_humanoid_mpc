@@ -11,6 +11,7 @@ build_dir ?= $(abspath $(lastword $(MAKEFILE_LIST))/../../..)
 CCACHE_DIR := $(build_dir)/.ccache
 
 ros_source_file := /bin/ros_setup.sh
+GENERATOR_ARGS ?=
 
 ifeq ("$(wildcard /opt/ros/jazzy/setup.bash)","")
     ifeq ("$(wildcard $(ros_source_file))","")
@@ -212,7 +213,8 @@ generate-g1-random-mpc-npz:
 	ros2 run humanoid_centroidal_mpc_ros2 humanoid_centroidal_mpc_random_reference_generator \
 		--task-file /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task_random_reference.info \
 		--reference-file /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/command/reference_random_reference.info \
-		--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz
+		--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz \
+		$(GENERATOR_ARGS)
 
 launch-g1-sim:
 	cd ${build_dir} && \
