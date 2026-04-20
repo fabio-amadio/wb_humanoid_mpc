@@ -57,6 +57,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "humanoid_centroidal_mpc/constraint/NormalVelocityConstraintCppAd.h"
 #include "humanoid_centroidal_mpc/constraint/ZeroVelocityConstraintCppAd.h"
 #include "humanoid_centroidal_mpc/cost/CentroidalMpcEndEffectorFootCost.h"
+#include "humanoid_centroidal_mpc/cost/FootSeparationCost.h"
 #include "humanoid_centroidal_mpc/cost/ICPCost.h"
 #include "humanoid_centroidal_mpc/dynamics/CentroidalDynamicsAD.h"
 
@@ -184,6 +185,13 @@ void CentroidalMpcInterface::setupOptimalControlProblem() {
   problemPtr_->costPtr->add(
       "icp_Cost", std::unique_ptr<StateInputCost>(new ICPCost(*referenceManagerPtr_, std::move(icpWeights), *pinocchioInterfacePtr_,
                                                               *mpcRobotModelADPtr_, "icp_Cost", modelSettings_)));
+
+  const auto footSeparationCostConfig = FootSeparationCost::loadConfig(taskFile_, "foot_separation_cost.", verbose_);
+  if (footSeparationCostConfig.enabled && footSeparationCostConfig.weight > 0.0) {
+    problemPtr_->costPtr->add("footSeparationCost", std::make_unique<FootSeparationCost>(
+                                                        footSeparationCostConfig, *pinocchioInterfacePtr_, *mpcRobotModelADPtr_,
+                                                        "footSeparationCost", modelSettings_));
+  }
 
   // Constraints
   problemPtr_->stateSoftConstraintPtr->add("jointLimits", factory.getJointLimitsConstraint());

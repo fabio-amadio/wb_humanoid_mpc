@@ -329,6 +329,16 @@ icp_cost_weights
   icpErrorWeight      0.0
 }
 
+foot_separation_cost
+{
+  enabled               true
+  weight                2000.0
+  minLateralSeparation  0.18
+  smoothingEpsilon      0.005
+  leftFootFrame         foot_l_contact
+  rightFootFrame        foot_r_contact
+}
+
 task_space_foot_cost_weights
 {
   pos_x               0.0

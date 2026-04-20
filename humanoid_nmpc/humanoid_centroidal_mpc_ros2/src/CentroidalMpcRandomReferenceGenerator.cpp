@@ -125,9 +125,9 @@ struct Options {
   size_t numMotions = 1;
   size_t maxAttemptsPerMotion = 20;
   scalar_t vxMin = -1.0;
-  scalar_t vxMax = 1.8;
-  scalar_t vyMin = -1.0;
-  scalar_t vyMax = 1.0;
+  scalar_t vxMax = 1.5;
+  scalar_t vyMin = -0.5;
+  scalar_t vyMax = 0.5;
   scalar_t yawRateMin = -1.0;
   scalar_t yawRateMax = 1.0;
   scalar_t heightMin = 0.4;
@@ -142,7 +142,7 @@ struct Options {
   scalar_t wristSegmentMax = 4.5;
   scalar_t armLimitMargin = 0.05;
   scalar_t stanceProbability = 0.2;
-  scalar_t headingProbability = 0.5;
+  scalar_t headingProbability = 0.8;
   scalar_t headingMin = -kPi;
   scalar_t headingMax = kPi;
   scalar_t headingControlStiffness = 1.0;

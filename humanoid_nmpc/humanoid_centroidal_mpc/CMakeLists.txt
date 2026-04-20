@@ -81,6 +81,7 @@ add_definitions("-DBOOST_MPL_LIMIT_LIST_SIZE=30")
 add_library(${PROJECT_NAME}
   src/dynamics/CentroidalDynamicsAD.cpp
   src/cost/CentroidalMpcEndEffectorFootCost.cpp
+  src/cost/FootSeparationCost.cpp
   src/cost/ICPCost.cpp
   src/constraint/ZeroVelocityConstraintCppAd.cpp
   src/constraint/NormalVelocityConstraintCppAd.cpp
