@@ -124,8 +124,8 @@ struct Options {
   uint32_t seed = 1;
   size_t numMotions = 1;
   size_t maxAttemptsPerMotion = 20;
-  scalar_t vxMin = -1.0;
-  scalar_t vxMax = 1.5;
+  scalar_t vxMin = -0.5;
+  scalar_t vxMax = 1.0;
   scalar_t vyMin = -0.5;
   scalar_t vyMax = 0.5;
   scalar_t yawRateMin = -1.0;
