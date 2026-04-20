@@ -214,10 +214,13 @@ struct MotionBuffers {
   std::vector<float> bodyQuat;
   std::vector<float> bodyLinVel;
   std::vector<float> bodyAngVel;
+  std::vector<float> contactWrench;
+  std::vector<uint8_t> contactFlags;
   std::vector<double> fps;
   size_t numFrames = 0;
   size_t numJoints = 0;
   size_t numBodies = 0;
+  size_t numContacts = 0;
 };
 
 struct ZipEntry {
@@ -405,13 +408,17 @@ void writeZip(const std::filesystem::path& path, std::vector<ZipEntry> entries) 
 void saveClampNpz(const std::filesystem::path& path,
                   const MotionBuffers& buffers,
                   const std::vector<std::string>& jointNames,
-                  const std::vector<std::string>& bodyNames) {
+                  const std::vector<std::string>& bodyNames,
+                  const std::vector<std::string>& contactNames) {
   const size_t expectedJointScalars = buffers.numFrames * buffers.numJoints;
   const size_t expectedBodyPositionScalars = buffers.numFrames * buffers.numBodies * 3;
   const size_t expectedBodyQuaternionScalars = buffers.numFrames * buffers.numBodies * 4;
+  const size_t expectedContactWrenchScalars = buffers.numFrames * buffers.numContacts * 6;
+  const size_t expectedContactFlagScalars = buffers.numFrames * buffers.numContacts;
   if (buffers.jointPos.size() != expectedJointScalars || buffers.jointVel.size() != expectedJointScalars ||
       buffers.bodyPos.size() != expectedBodyPositionScalars || buffers.bodyLinVel.size() != expectedBodyPositionScalars ||
-      buffers.bodyAngVel.size() != expectedBodyPositionScalars || buffers.bodyQuat.size() != expectedBodyQuaternionScalars) {
+      buffers.bodyAngVel.size() != expectedBodyPositionScalars || buffers.bodyQuat.size() != expectedBodyQuaternionScalars ||
+      buffers.contactWrench.size() != expectedContactWrenchScalars || buffers.contactFlags.size() != expectedContactFlagScalars) {
     throw std::runtime_error("Motion buffer sizes do not match the requested NPZ shapes.");
   }
 
@@ -422,8 +429,11 @@ void saveClampNpz(const std::filesystem::path& path,
   entries.push_back({"body_quat_w.npy", makeNumericNpy(buffers.bodyQuat, "<f4", {buffers.numFrames, buffers.numBodies, 4})});
   entries.push_back({"body_lin_vel_w.npy", makeNumericNpy(buffers.bodyLinVel, "<f4", {buffers.numFrames, buffers.numBodies, 3})});
   entries.push_back({"body_ang_vel_w.npy", makeNumericNpy(buffers.bodyAngVel, "<f4", {buffers.numFrames, buffers.numBodies, 3})});
+  entries.push_back({"contact_wrench_w.npy", makeNumericNpy(buffers.contactWrench, "<f4", {buffers.numFrames, buffers.numContacts, 6})});
+  entries.push_back({"contact_flags.npy", makeNumericNpy(buffers.contactFlags, "|u1", {buffers.numFrames, buffers.numContacts})});
   entries.push_back({"body_names.npy", makeStringNpy(bodyNames, 32)});
   entries.push_back({"body_link_names.npy", makeStringNpy(bodyNames, 32)});
+  entries.push_back({"contact_names.npy", makeStringNpy(contactNames, 32)});
   entries.push_back({"joint_names.npy", makeStringNpy(jointNames, 40)});
   entries.push_back({"fps.npy", makeNumericNpy(buffers.fps, "<f8", {1})});
   writeZip(path, std::move(entries));
@@ -791,6 +801,26 @@ void appendBodyPoses(MotionBuffers& buffers,
   }
 }
 
+void appendContactData(MotionBuffers& buffers,
+                       const MpcRobotModelBase<scalar_t>& mpcRobotModel,
+                       const vector_t& input,
+                       const contact_flag_t& contactFlags) {
+  if (contactFlags.size() != buffers.numContacts) {
+    throw std::runtime_error("Contact flag dimension does not match configured contacts.");
+  }
+
+  for (size_t contactIndex = 0; contactIndex < buffers.numContacts; ++contactIndex) {
+    const vector6_t wrench = mpcRobotModel.getContactWrench(input, contactIndex);
+    for (Eigen::Index i = 0; i < wrench.size(); ++i) {
+      buffers.contactWrench.push_back(static_cast<float>(wrench[i]));
+    }
+  }
+
+  for (size_t contactIndex = 0; contactIndex < buffers.numContacts; ++contactIndex) {
+    buffers.contactFlags.push_back(contactFlags[contactIndex] ? uint8_t{1} : uint8_t{0});
+  }
+}
+
 void fillFiniteDifferenceBodyVelocities(MotionBuffers& buffers, scalar_t dt) {
   const size_t nFrames = buffers.numFrames;
   const size_t nBodies = buffers.numBodies;
@@ -970,6 +1000,7 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
   MotionBuffers buffers;
   buffers.numJoints = modelSettings.full_joint_dim;
   buffers.numBodies = bodyNames.size();
+  buffers.numContacts = modelSettings.contactNames6DoF.size();
   buffers.fps = {options.fps};
 
   const scalar_t dt = 1.0 / options.fps;
@@ -1068,6 +1099,8 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
 
     appendFullJointState(buffers, fullJointPos, fullJointVel);
     appendBodyPoses(buffers, fullModel, fullData, bodyFrameIds, mpcRobotModel.getBasePose(observation.state), fullJointPos);
+    appendContactData(buffers, mpcRobotModel, observation.input,
+                      interface.getSwitchedModelReferenceManagerPtr()->getContactFlags(observation.time));
     ++buffers.numFrames;
 
     if (frame % 25 == 0) {
@@ -1077,7 +1110,7 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
   }
 
   fillFiniteDifferenceBodyVelocities(buffers, dt);
-  saveClampNpz(outputPath, buffers, toStringVector(modelSettings.fullJointNames), bodyNames);
+  saveClampNpz(outputPath, buffers, toStringVector(modelSettings.fullJointNames), bodyNames, modelSettings.contactNames6DoF);
 
   std::cout << "[random_mpc_generator] saved " << buffers.numFrames << " frames to " << outputPath.string() << "\n";
 }
