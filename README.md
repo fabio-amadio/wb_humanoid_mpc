@@ -217,15 +217,15 @@ make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src
 
 make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_right.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.0 --vx-max 0.0 --vy-min -0.5 --vy-max -0.1 --yaw-rate-min 0.0 --yaw-rate-max 0.0 --height-min 0.7925 --height-max 0.7925"
 
-make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_turn_left.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.0 --vx-max 0.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min 0.2 --yaw-rate-max 1.0 --height-min 0.7925 --height-max 0.7925"
+make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_turn_left.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.0 --vx-max 0.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min 0.2 --yaw-rate-max 0.5 --height-min 0.7925 --height-max 0.7925"
 
-make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_turn_right.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.0 --vx-max 0.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min -1.0 --yaw-rate-max -0.2 --height-min 0.7925 --height-max 0.7925"
+make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_turn_right.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.0 --vx-max 0.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min -0.5 --yaw-rate-max -0.2 --height-min 0.7925 --height-max 0.7925"
 
 make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_stance_height.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 1.0 --vx-min 0.0 --vx-max 0.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min 0.0 --yaw-rate-max 0.0 --height-min 0.4 --height-max 0.8"
 
-make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_forward_turn_left.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.2 --vx-max 1.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min 0.2 --yaw-rate-max 1.0 --height-min 0.7925 --height-max 0.7925"
+make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_forward_turn_left.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.2 --vx-max 1.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min 0.2 --yaw-rate-max 0.5 --height-min 0.7925 --height-max 0.7925"
 
-make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_forward_turn_right.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.2 --vx-max 1.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min -1.0 --yaw-rate-max -0.2 --height-min 0.7925 --height-max 0.7925"
+make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_forward_turn_right.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.2 --vx-max 1.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min -0.5 --yaw-rate-max -0.2 --height-min 0.7925 --height-max 0.7925"
 ```
 
 You can also call the generator directly after sourcing the workspace:

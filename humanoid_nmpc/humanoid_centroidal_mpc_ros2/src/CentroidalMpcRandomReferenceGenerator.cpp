@@ -128,8 +128,8 @@ struct Options {
   scalar_t vxMax = 1.0;
   scalar_t vyMin = -0.5;
   scalar_t vyMax = 0.5;
-  scalar_t yawRateMin = -1.0;
-  scalar_t yawRateMax = 1.0;
+  scalar_t yawRateMin = -0.5;
+  scalar_t yawRateMax = 0.5;
   scalar_t heightMin = 0.4;
   scalar_t heightMax = 0.8;
   scalar_t cmdVelSegmentMin = 3.0;
