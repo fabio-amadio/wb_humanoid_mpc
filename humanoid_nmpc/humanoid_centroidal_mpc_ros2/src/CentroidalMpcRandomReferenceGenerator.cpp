@@ -132,6 +132,7 @@ struct Options {
   scalar_t yawRateMax = 0.5;
   scalar_t heightMin = 0.4;
   scalar_t heightMax = 0.8;
+  scalar_t baseCommandDeadband = 0.1;
   scalar_t cmdVelSegmentMin = 3.0;
   scalar_t cmdVelSegmentMax = 9.0;
   scalar_t waistSegmentMin = 1.5;
@@ -516,6 +517,8 @@ Options parseOptions(int argc, char** argv) {
       options.heightMin = parseScalar(requireValue(i, argc, argv), arg);
     } else if (arg == "--height-max") {
       options.heightMax = parseScalar(requireValue(i, argc, argv), arg);
+    } else if (arg == "--base-command-deadband") {
+      options.baseCommandDeadband = parseScalar(requireValue(i, argc, argv), arg);
     } else if (arg == "--cmd-vel-segment-min") {
       options.cmdVelSegmentMin = parseScalar(requireValue(i, argc, argv), arg);
     } else if (arg == "--cmd-vel-segment-max") {
@@ -541,6 +544,7 @@ Options parseOptions(int argc, char** argv) {
                 << "       [--max-attempts-per-motion N]\n"
                 << "       [--vx-min V] [--vx-max V] [--vy-min V] [--vy-max V]\n"
                 << "       [--yaw-rate-min V] [--yaw-rate-max V] [--height-min H] [--height-max H]\n"
+                << "       [--base-command-deadband V]\n"
                 << "       [--cmd-vel-segment-min SEC] [--cmd-vel-segment-max SEC]\n"
                 << "       [--stance-probability P] [--heading-prob P] [--upper-body-fixed-probability P]\n"
                 << "       [--heading-min RAD] [--heading-max RAD] [--heading-control-stiffness K]\n"
@@ -576,6 +580,9 @@ Options parseOptions(int argc, char** argv) {
   if (options.headingControlStiffness < 0.0) {
     throw std::runtime_error("--heading-control-stiffness must be non-negative.");
   }
+  if (options.baseCommandDeadband < 0.0) {
+    throw std::runtime_error("--base-command-deadband must be non-negative.");
+  }
   requireOrderedRange(options.vxMin, options.vxMax, "--vx-min/max");
   requireOrderedRange(options.vyMin, options.vyMax, "--vy-min/max");
   requireOrderedRange(options.yawRateMin, options.yawRateMax, "--yaw-rate-min/max");
@@ -607,6 +614,17 @@ std::filesystem::path temporaryOutputPathForAttempt(const std::filesystem::path&
   std::ostringstream suffix;
   suffix << ".attempt_" << std::setw(3) << std::setfill('0') << attemptIndex << ".tmp";
   return outputPath.parent_path() / (outputPath.filename().string() + suffix.str());
+}
+
+void applyBaseCommandDeadband(vector4_t& command, scalar_t deadband) {
+  if (deadband <= 0.0) {
+    return;
+  }
+  for (const int index : {0, 1, 3}) {
+    if (std::abs(command[index]) < deadband) {
+      command[index] = 0.0;
+    }
+  }
 }
 
 SmoothScalarTrajectory makeRandomSmoothTrajectory(scalar_t duration,
@@ -1035,6 +1053,7 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
       filteredVelCommand[1] = 0.0;
       filteredVelCommand[3] = 0.0;
     }
+    applyBaseCommandDeadband(filteredVelCommand, options.baseCommandDeadband);
     const vector6_t baseVelocity = mpcRobotModel.getBaseComVelocity(observation.state);
     auto currentCfg = gaitModeStates[currentGaitMode];
 
