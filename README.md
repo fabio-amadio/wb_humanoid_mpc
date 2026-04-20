@@ -196,7 +196,7 @@ To generate a CLAMP-style NPZ directly from the centroidal SQP without ROS 2 top
 make generate-g1-random-mpc-npz
 ```
 
-This writes `/wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz`, visible on the host at `/home/famadio/Workspace/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz`. The generator saves a compressed NPZ and samples smooth random base velocity, pelvis height, yaw-rate, waist joints, and arm joints. For this generator, the wrist joints are kept in the MPC model, so the exported motion includes the full 29-DOF G1 joint set. The default random command ranges are `vx [-1.0, 1.8] m/s`, `vy [-1.0, 1.0] m/s`, `yaw_rate [-1.0, 1.0] rad/s`, and `height [0.4, 0.8] m`. The base command velocity, height, stance, and heading segments are resampled every `3.0` to `9.0` seconds by default. With default probability `0.20`, a command velocity segment is forced to stance with zero linear and angular base velocity. With default probability `0.40`, a command velocity segment uses heading control: a target heading is sampled in `[-pi, pi]`, configurable with `--heading-min` and `--heading-max`, then the yaw-rate command is computed from the wrapped heading error and clamped to the yaw-rate range. The waist targets are clamped to the `[-90, 90] deg` range and resampled every `3.0` to `9.0` seconds; the shoulder and elbow targets are resampled every `2.0` to `6.0` seconds; the wrist targets are resampled every `1.5` to `4.5` seconds. With default probability `0.20`, each waist/arm/wrist segment keeps the previous joint reference instead of drawing a new target; if this happens at `t=0`, it keeps the nominal `defaultJointState`. The random-reference task also enables a soft foot-separation cost that penalizes the left foot getting too close to or crossing over the right foot in the pelvis yaw frame; tune `foot_separation_cost.weight` and `foot_separation_cost.minLateralSeparation` in `task_random_reference.info` if it is too weak or too restrictive. The gait is otherwise selected from the same procedural ladder used by the dummy example: `stance`, `slow_walk`, `walk`, `slower_trot`, `slow_trot`, `trot`, and `run`, using the same velocity thresholds. The gait timings are read from the existing `humanoid_common_mpc/config/command/gait.info`.
+This writes `/wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz`, visible on the host at `/home/famadio/Workspace/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz`. The generator saves a compressed NPZ and samples smooth random base velocity, pelvis height, yaw-rate, waist joints, and arm joints. For this generator, the wrist joints are kept in the MPC model, so the exported motion includes the full 29-DOF G1 joint set. The default random command ranges are `vx [-0.5, 1.0] m/s`, `vy [-0.5, 0.5] m/s`, `yaw_rate [-1.0, 1.0] rad/s`, and `height [0.4, 0.8] m`. The base command velocity, height, stance, and heading segments are resampled every `3.0` to `9.0` seconds by default. With default probability `0.20`, a command velocity segment is forced to stance with zero linear and angular base velocity. With default probability `0.80`, a command velocity segment uses heading control: a target heading is sampled in `[-pi, pi]`, configurable with `--heading-min` and `--heading-max`, then the yaw-rate command is computed from the wrapped heading error and clamped to the yaw-rate range. The waist targets are clamped to the `[-90, 90] deg` range and resampled every `1.5` to `4.5` seconds; the shoulder and elbow targets are resampled every `2.0` to `6.0` seconds; the wrist targets are resampled every `1.5` to `4.5` seconds. With default probability `0.20`, each waist/arm/wrist segment keeps the previous joint reference instead of drawing a new target; if this happens at `t=0`, it keeps the nominal `defaultJointState`. The random-reference task also enables a soft foot-separation cost that penalizes the left foot getting too close to or crossing over the right foot in the pelvis yaw frame; tune `foot_separation_cost.weight` and `foot_separation_cost.minLateralSeparation` in `task_random_reference.info` if it is too weak or too restrictive. The gait is otherwise selected from the same procedural ladder used by the dummy example: `stance`, `slow_walk`, `walk`, `slower_trot`, `slow_trot`, `trot`, and `run`, using the same velocity thresholds. The gait timings are read from the existing `humanoid_common_mpc/config/command/gait.info`.
 
 To generate several independent motions in one run, pass `--num-motions` through the make target:
 
@@ -205,6 +205,28 @@ make generate-g1-random-mpc-npz GENERATOR_ARGS="--num-motions 10"
 ```
 
 When `--num-motions` is larger than `1`, the output path is expanded with a numbered suffix, for example `g1_random_mpc_reference_0000.npz`, `g1_random_mpc_reference_0001.npz`, and so on. Each attempt runs in a fresh child process, so a failed rollout or a native crash such as a segmentation fault only discards that attempt instead of killing the full batch. By default each output motion gets up to `20` attempts.
+
+For basic locomotion datasets with the upper body fixed, set `--upper-body-fixed-probability 1.0`, disable heading control with `--heading-prob 0.0`, and zero the velocity axes that should not be active. The following examples keep the command ranges inside the generator defaults:
+
+```bash
+make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_forward.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.2 --vx-max 1.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min 0.0 --yaw-rate-max 0.0"
+
+make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_backward.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min -0.5 --vx-max -0.1 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min 0.0 --yaw-rate-max 0.0"
+
+make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_left.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.0 --vx-max 0.0 --vy-min 0.1 --vy-max 0.5 --yaw-rate-min 0.0 --yaw-rate-max 0.0"
+
+make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_right.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.0 --vx-max 0.0 --vy-min -0.5 --vy-max -0.1 --yaw-rate-min 0.0 --yaw-rate-max 0.0"
+
+make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_turn_left.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.0 --vx-max 0.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min 0.2 --yaw-rate-max 1.0"
+
+make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_turn_right.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.0 --vx-max 0.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min -1.0 --yaw-rate-max -0.2"
+
+make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_stance_height.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 1.0 --vx-min 0.0 --vx-max 0.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min 0.0 --yaw-rate-max 0.0 --height-min 0.4 --height-max 0.8"
+
+make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_forward_turn_left.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.2 --vx-max 1.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min 0.2 --yaw-rate-max 1.0"
+
+make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_forward_turn_right.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.2 --vx-max 1.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min -1.0 --yaw-rate-max -0.2"
+```
 
 You can also call the generator directly after sourcing the workspace:
 
@@ -219,7 +241,7 @@ ros2 run humanoid_centroidal_mpc_ros2 humanoid_centroidal_mpc_random_reference_g
   --num-motions 10 \
   --max-attempts-per-motion 20 \
   --stance-probability 0.20 \
-  --heading-prob 0.40 \
+  --heading-prob 0.80 \
   --heading-min -3.14159 \
   --heading-max 3.14159 \
   --heading-control-stiffness 1.0 \
