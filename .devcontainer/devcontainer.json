@@ -22,6 +22,7 @@
     "--privileged",
     "-u", "${localEnv:USER_ID}:${localEnv:GROUP_ID}",
     "-e", "DISPLAY",
+    "-e", "RMW_IMPLEMENTATION=rmw_cyclonedds_cpp",
     "-e", "QT_X11_NO_MITSHM=1",
     "-e", "XDG_RUNTIME_DIR=${localEnv:XDG_RUNTIME_DIR}",
     "-e",

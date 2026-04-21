@@ -38,6 +38,7 @@ docker run --rm -it \
   --privileged \
   -u root \
   -e DISPLAY \
+  -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
   -e QT_X11_NO_MITSHM=1 \
   -e XAUTHORITY="${XAUTH}" \
   -e XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}" \

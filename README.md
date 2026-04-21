@@ -138,6 +138,14 @@ source /opt/ros/humble/setup.bash
 source /wb_humanoid_mpc_ws/install/setup.bash
 ```
 
+This Docker setup now defaults to Cyclone DDS:
+
+```bash
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+```
+
+If you want to inspect ROS 2 topics from the host or another container, set the same `RMW_IMPLEMENTATION` there as well.
+
 Then send a right hand pose reference:
 
 ```bash
