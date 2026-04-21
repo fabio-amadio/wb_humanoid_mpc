@@ -131,6 +131,13 @@ The RViz config now also includes 6-DoF interactive markers under `Hand Pose Mar
  docker exec -it wb-mpc-dev bash
 ```
 
+Then source ROS 2 and the workspace in that terminal:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source /wb_humanoid_mpc_ws/install/setup.bash
+```
+
 Then send a right hand pose reference:
 
 ```bash
@@ -175,13 +182,26 @@ make launch-g1-dummy-sim-hands-cartesian-mpc-motion-reference
 
 Both dummy-sim task files enable the same soft foot-separation cost used by the random-reference generator. Tune `foot_separation_cost.weight` or `foot_separation_cost.minLateralSeparation` in `robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task.info` or `task_hands_cartesian.info`, then rebuild/relaunch.
 
-This publishes `/g1/mpc_motion_reference`, containing the named joint position/velocity reference, root pose/twist in world, and the flattened CLAMP command layout:
+This publishes `/g1/mpc_motion_reference`, containing the named joint position/velocity reference, root pose/twist in world, and the flattened motion command layout:
 
 ```text
 [joint_pos, joint_vel, base_vx_body, base_vy_body, base_yaw_rate_body, base_height, base_roll, base_pitch]
 ```
 
-To record this stream as a CLAMP-compatible NPZ for offline policy playback, open a second terminal in the same Docker container and run:
+where:
+
+- `joint_pos`: joint position reference in the G1 policy joint order
+- `joint_vel`: joint velocity reference in the same joint order
+- `base_vx_body`: desired base linear velocity along the robot forward axis, expressed in the body frame
+- `base_vy_body`: desired base linear velocity along the robot lateral axis, expressed in the body frame
+- `base_yaw_rate_body`: desired base yaw angular velocity
+- `base_height`: desired base height
+- `base_roll`: desired base roll angle
+- `base_pitch`: desired base pitch angle
+
+This is already the motion-command structure used downstream by the policy interface; the ROS message additionally carries the named joint/state fields separately for convenience and debugging.
+
+To record this stream as a compatible NPZ for offline policy playback, open a second terminal in the same Docker container and run:
 
 ```bash
 ros2 run humanoid_common_mpc_pyutils mpc_motion_reference_recorder \
@@ -192,7 +212,7 @@ ros2 run humanoid_common_mpc_pyutils mpc_motion_reference_recorder \
 
 The resulting NPZ contains `joint_pos`, `joint_vel`, `body_pos_w`, `body_quat_w`, `body_lin_vel_w`, `body_ang_vel_w`, `body_names`, and `fps`. It will be available on the host at `/home/famadio/Workspace/wb_humanoid_mpc/g1_mpc_motion_reference.npz`.
 
-To generate a CLAMP-style NPZ directly from the centroidal SQP without ROS 2 topics, dummy sim, or visualization, run:
+To generate a NPZ directly from the centroidal SQP without ROS 2 topics, dummy sim, or visualization, run:
 
 ```bash
 make generate-g1-random-mpc-npz

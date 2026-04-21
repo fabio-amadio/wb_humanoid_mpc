@@ -27,7 +27,7 @@ class MpcMotionReferenceRecorder(Node):
         self.root_quat_w: list[np.ndarray] = []
         self.root_lin_vel_w: list[np.ndarray] = []
         self.root_ang_vel_w: list[np.ndarray] = []
-        self.clamp_command: list[np.ndarray] = []
+        self.motion_cmd: list[np.ndarray] = []
 
         qos_profile = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, depth=100)
         self.subscription = self.create_subscription(
@@ -103,7 +103,7 @@ class MpcMotionReferenceRecorder(Node):
                 dtype=np.float64,
             )
         )
-        self.clamp_command.append(np.asarray(msg.clamp_command, dtype=np.float32))
+        self.motion_cmd.append(np.asarray(msg.motion_cmd, dtype=np.float32))
 
         if len(self.timestamps_s) % 100 == 0:
             self.get_logger().info(f"Recorded {len(self.timestamps_s)} MPC reference frames.")
@@ -135,7 +135,7 @@ class MpcMotionReferenceRecorder(Node):
             joint_names=np.asarray(self.joint_names),
             fps=np.asarray([fps], dtype=np.float64),
             timestamps_s=timestamps,
-            clamp_command=np.asarray(self.clamp_command, dtype=np.float32),
+            motion_cmd=np.asarray(self.motion_cmd, dtype=np.float32),
         )
         self.get_logger().info(
             f"Saved {len(self.timestamps_s)} frames to `{self.output}` at estimated fps={fps:.3f}."

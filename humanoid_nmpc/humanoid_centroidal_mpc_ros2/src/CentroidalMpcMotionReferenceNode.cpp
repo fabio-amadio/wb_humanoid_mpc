@@ -225,19 +225,19 @@ class CentroidalMpcMotionReferencePublisher {
     referenceMsg.root_twist_w.angular.y = rootAngularVelocityWorld.y();
     referenceMsg.root_twist_w.angular.z = rootAngularVelocityWorld.z();
 
-    referenceMsg.clamp_command.reserve(2 * fullJointAngles.size() + 6);
+    referenceMsg.motion_cmd.reserve(2 * fullJointAngles.size() + 6);
     for (Eigen::Index i = 0; i < fullJointAngles.size(); ++i) {
-      referenceMsg.clamp_command.push_back(static_cast<float>(fullJointAngles[i]));
+      referenceMsg.motion_cmd.push_back(static_cast<float>(fullJointAngles[i]));
     }
     for (Eigen::Index i = 0; i < fullJointVelocities.size(); ++i) {
-      referenceMsg.clamp_command.push_back(static_cast<float>(fullJointVelocities[i]));
+      referenceMsg.motion_cmd.push_back(static_cast<float>(fullJointVelocities[i]));
     }
-    referenceMsg.clamp_command.push_back(static_cast<float>(rootLinearVelocityBase.x()));
-    referenceMsg.clamp_command.push_back(static_cast<float>(rootLinearVelocityBase.y()));
-    referenceMsg.clamp_command.push_back(static_cast<float>(rootAngularVelocityBase.z()));
-    referenceMsg.clamp_command.push_back(static_cast<float>(basePose[2]));
-    referenceMsg.clamp_command.push_back(static_cast<float>(basePose[5]));
-    referenceMsg.clamp_command.push_back(static_cast<float>(basePose[4]));
+    referenceMsg.motion_cmd.push_back(static_cast<float>(rootLinearVelocityBase.x()));
+    referenceMsg.motion_cmd.push_back(static_cast<float>(rootLinearVelocityBase.y()));
+    referenceMsg.motion_cmd.push_back(static_cast<float>(rootAngularVelocityBase.z()));
+    referenceMsg.motion_cmd.push_back(static_cast<float>(basePose[2]));
+    referenceMsg.motion_cmd.push_back(static_cast<float>(basePose[5]));
+    referenceMsg.motion_cmd.push_back(static_cast<float>(basePose[4]));
 
     motionReferencePublisher_->publish(referenceMsg);
   }
