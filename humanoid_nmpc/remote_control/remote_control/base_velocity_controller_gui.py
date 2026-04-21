@@ -37,6 +37,8 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy
 from remote_control import XBoxControllerInterface
 from remote_control.tk_app import JoystickGui, LEDIndicatorGui
 
+DEFAULT_BASE_HEIGHT = 0.7925
+
 
 class App(tk.Tk):
     def __init__(self):
@@ -217,7 +219,7 @@ class App(tk.Tk):
         msg.linear_velocity_y = self.joystick_left.y_norm
         msg.angular_velocity_z = self.joystick_right.y_norm
 
-        msg.desired_pelvis_height = self.slider.get() * 0.008 + 0.2
+        msg.desired_pelvis_height = min(self.slider.get() * 0.008 + 0.2, DEFAULT_BASE_HEIGHT)
         return msg
 
 

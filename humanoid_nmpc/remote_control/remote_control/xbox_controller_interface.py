@@ -33,6 +33,8 @@ import subprocess
 from dataclasses import dataclass
 from humanoid_mpc_msgs.msg import WalkingVelocityCommand
 
+DEFAULT_BASE_HEIGHT = 0.7925
+
 
 @dataclass
 class ControllerInput:
@@ -66,9 +68,9 @@ class XBoxControllerInterface:
         self.joystick_connected = False
         self.get_joystick_connection()
 
-        self.current_pelvis_height_target = 0.8
+        self.current_pelvis_height_target = DEFAULT_BASE_HEIGHT
         self.min_pelvis_height = 0.2
-        self.max_pelvis_height = 1.0
+        self.max_pelvis_height = DEFAULT_BASE_HEIGHT
         self.exp = 1.5
 
         self.publisher_rate = publisher_rate

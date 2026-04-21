@@ -37,6 +37,8 @@ import tty
 import fcntl
 import os
 
+DEFAULT_BASE_HEIGHT = 0.7925
+
 
 def clamp(value, min_value, max_value):
     return max(min_value, min(value, max_value))
@@ -54,9 +56,9 @@ class KeyboardWalkingCommandPublisher(Node):
         self.y_vel = 0
         self.yaw_vel = 0
 
-        self.current_pelvis_height_target = 0.8
+        self.current_pelvis_height_target = DEFAULT_BASE_HEIGHT
         self.min_pelvis_height = 0.2
-        self.max_pelvis_height = 1.0
+        self.max_pelvis_height = DEFAULT_BASE_HEIGHT
         self.delta_pelvis_height = 0.0
 
         # Create a QoS profile with Best Effort reliability
