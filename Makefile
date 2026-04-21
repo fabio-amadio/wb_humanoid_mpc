@@ -12,15 +12,10 @@ CCACHE_DIR := $(build_dir)/.ccache
 
 ros_source_file := /bin/ros_setup.sh
 GENERATOR_ARGS ?=
+ROS_DISTRO ?= humble
 
-ifeq ("$(wildcard /opt/ros/jazzy/setup.bash)","")
-    ifeq ("$(wildcard $(ros_source_file))","")
-        ros_source_file := /opt/ros/humble/setup.bash
-    endif
-else
-    ifeq ("$(wildcard $(ros_source_file))","")
-        ros_source_file := /opt/ros/jazzy/setup.bash
-    endif
+ifeq ("$(wildcard $(ros_source_file))","")
+    ros_source_file := /opt/ros/$(ROS_DISTRO)/setup.bash
 endif
 
 LINKER_FLAGS = "$(shell python3-config --ldflags --embed)"
@@ -97,12 +92,26 @@ COMMON_COLCON_BUILD_FLAGS ?= \
 	--build-base $(build_dir)/build \
 	--install-base $(build_dir)/install
 
+RESET_ROS_ENV = \
+	unset AMENT_PREFIX_PATH && \
+	unset CMAKE_PREFIX_PATH && \
+	unset COLCON_PREFIX_PATH && \
+	unset COLCON_CURRENT_PREFIX && \
+	unset ROS_DISTRO && \
+	unset ROS_VERSION && \
+	unset ROS_PYTHON_VERSION && \
+	unset ROS_ETC_DIR && \
+	unset ROS_ROOT && \
+	unset ROS_PACKAGE_PATH && \
+	unset GTEST_DIR
+
 ############################################################
 # Define build and test targets
 ############################################################
 define default-build-package
 	cd ${build_dir} && \
 	export MAKEFLAGS="-j ${PARALLEL_JOBS} -d" && \
+	${RESET_ROS_ENV} && \
 	source ${ros_source_file} && \
 	colcon build ${COMMON_COLCON_BUILD_FLAGS} --packages-up-to $(1) \
 	--cmake-args ${COMMON_CMAKE_ARGS} $(EXTRA_CMAKE_ARGS) && \
@@ -111,12 +120,14 @@ endef
 
 define default-build-python-package
 	cd ${build_dir} && \
+	${RESET_ROS_ENV} && \
 	source ${ros_source_file} && \
 	colcon build ${COMMON_COLCON_BUILD_FLAGS} --packages-up-to $(1)
 endef
 
 define default-test-package
   cd ${build_dir} && \
+  ${RESET_ROS_ENV} && \
   source ${ros_source_file} && \
   source $(build_dir)/install/setup.bash && \
   colcon test --packages-select $(1) --event-handlers console_direct+ --return-code-on-test-failure

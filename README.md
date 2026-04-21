@@ -74,8 +74,8 @@ cd /path/to/humanoid_mpc_ws/src/wb_humanoid_mpc/docker
 <details>
 <summary>Install Dependencies Locally</summary>
 
-Make sure you have **ros2** installed on your system as e.g specified for jazzy in
-the [installation guide](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html).
+Make sure you have **ros2** installed on your system as e.g specified for Humble in
+the [installation guide](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html).
 
 Then install all dependencies using:
 
@@ -134,7 +134,7 @@ The RViz config now also includes 6-DoF interactive markers under `Hand Pose Mar
 Then source ROS 2 and the workspace in that terminal:
 
 ```bash
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/humble/setup.bash
 source /wb_humanoid_mpc_ws/install/setup.bash
 ```
 

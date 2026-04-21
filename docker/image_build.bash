@@ -17,7 +17,8 @@ TARGET="base"
 
 : "# Workspace directory inside container"
 WB_HUMANOID_MPC_DIR="/wb_humanoid_mpc_ws"
-PYTHON_VERSION="3.12"
+ROS_DISTRO="humble"
+PYTHON_VERSION="3.10"
 USER_ID="$(id -u)"
 GROUP_ID="$(id -g)"
 GIT_USER_NAME="$(git config --global user.name || echo '')"
@@ -28,6 +29,7 @@ IMAGE_TAG="wb-humanoid-mpc:dev"
 docker build \
   --file "${DOCKERFILE}" \
   --target "${TARGET}" \
+  --build-arg ROS_DISTRO="${ROS_DISTRO}" \
   --build-arg WB_HUMANOID_MPC_DIR="${WB_HUMANOID_MPC_DIR}" \
   --build-arg PYTHON_VERSION="${PYTHON_VERSION}" \
   --build-arg USER_ID="${USER_ID}" \
@@ -38,4 +40,3 @@ docker build \
   "${CONTEXT}"
 
 echo "Built image: ${IMAGE_TAG}"
-
