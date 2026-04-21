@@ -254,17 +254,17 @@ R
   (24,24) 2000.0      ;    waist_yaw_joint
   (25,25) 800.0      ;    waist_roll_joint
   (26,26) 2000.0      ;    waist_pitch_joint
-  (27,27) 20.0      ;    left_shoulder_pitch_joint
+  (27,27) 10.0      ;    left_shoulder_pitch_joint
   (28,28) 10.0      ;    left_shoulder_roll_joint
   (29,29) 10.0      ;    left_shoulder_yaw_joint
-  (30,30) 20.0      ;    left_elbow_joint
+  (30,30) 10.0      ;    left_elbow_joint
   (31,31) 0.5      ;    left_wrist_roll_joint
   (32,32) 0.5      ;    left_wrist_pitch_joint
   (33,33) 0.5      ;    left_wrist_yaw_joint
-  (34,34) 20.0      ;    right_shoulder_pitch_joint
+  (34,34) 10.0      ;    right_shoulder_pitch_joint
   (35,35) 10.0      ;    right_shoulder_roll_joint
   (36,36) 10.0      ;    right_shoulder_yaw_joint
-  (37,37) 20.0      ;    right_elbow_joint
+  (37,37) 10.0      ;    right_elbow_joint
   (38,38) 0.5      ;    right_wrist_roll_joint
   (39,39) 0.5      ;    right_wrist_pitch_joint
   (40,40) 0.5      ;    right_wrist_yaw_joint
@@ -308,20 +308,20 @@ Q_final
   (24,24) 2.0      ;    waist_yaw_joint
   (25,25) 0.5      ;    waist_roll_joint
   (26,26) 0.5      ;    waist_pitch_joint
-  (27,27) 1.0      ;    left_shoulder_pitch_joint
-  (28,28) 1.0      ;    left_shoulder_roll_joint
-  (29,29) 1.0      ;    left_shoulder_yaw_joint
-  (30,30) 1.0      ;    left_elbow_joint
-  (31,31) 0.1      ;    left_wrist_roll_joint
-  (32,32) 0.1      ;    left_wrist_pitch_joint
-  (33,33) 0.1      ;    left_wrist_yaw_joint
-  (34,34) 1.0      ;    right_shoulder_pitch_joint
-  (35,35) 1.0      ;    right_shoulder_roll_joint
-  (36,36) 1.0      ;    right_shoulder_yaw_joint
-  (37,37) 1.0      ;    right_elbow_joint
-  (38,38) 0.1      ;    right_wrist_roll_joint
-  (39,39) 0.1      ;    right_wrist_pitch_joint
-  (40,40) 0.1      ;    right_wrist_yaw_joint
+  (27,27) 0.0      ;    left_shoulder_pitch_joint
+  (28,28) 0.0      ;    left_shoulder_roll_joint
+  (29,29) 0.0      ;    left_shoulder_yaw_joint
+  (30,30) 0.0      ;    left_elbow_joint
+  (31,31) 0.0      ;    left_wrist_roll_joint
+  (32,32) 0.0      ;    left_wrist_pitch_joint
+  (33,33) 0.0      ;    left_wrist_yaw_joint
+  (34,34) 0.0      ;    right_shoulder_pitch_joint
+  (35,35) 0.0      ;    right_shoulder_roll_joint
+  (36,36) 0.0      ;    right_shoulder_yaw_joint
+  (37,37) 0.0      ;    right_elbow_joint
+  (38,38) 0.0      ;    right_wrist_roll_joint
+  (39,39) 0.0      ;    right_wrist_pitch_joint
+  (40,40) 0.0      ;    right_wrist_yaw_joint
 }
 
 icp_cost_weights
