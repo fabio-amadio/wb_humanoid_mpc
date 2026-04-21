@@ -27,7 +27,7 @@ model_settings
   armSwingReferenceActive         false
 
   verboseCppAd                  true
-  recompileLibrariesCppAd       true
+  recompileLibrariesCppAd       false
   modelFolderCppAd              build/centroidal_mpc_cppad_autocode_gen
 
   ; Exclude these joints from MPC model
@@ -170,12 +170,12 @@ Q
   scaling 1e+0
 
   ;; Normalized Centroidal Momentum: [linear, angular] ;;
-  (0,0)   8.0     ; h_com_x / robotMass
-  (1,1)   8.0     ; h_com_y / robotMass
+  (0,0)   16.0     ; h_com_x / robotMass
+  (1,1)   16.0     ; h_com_y / robotMass
   (2,2)   15.0     ; h_com_z / robotMass
   (3,3)   15.0      ; L_x / robotMass
   (4,4)   15.0      ; L_y / robotMass
-  (5,5)   4.0      ; L_z / robotMass
+  (5,5)   16.0      ; L_z / robotMass
 
   ;; Base Pose: [position, orientation] ;;
   (6,6)   0.0    ; p_base_x

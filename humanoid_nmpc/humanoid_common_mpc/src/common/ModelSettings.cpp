@@ -122,6 +122,7 @@ ModelSettings::ModelSettings(const std::string& configFile, const std::string& u
   loadData::loadPtreeValue(pt, this->j_l_elbow_y_name, prefix + "armJointNames.left_elbow_y", verbose);
   loadData::loadPtreeValue(pt, this->j_r_elbow_y_name, prefix + "armJointNames.right_elbow_y", verbose);
   modelFolderCppAd = "cppad_code_gen/cppad_" + mpcName + robotName;
+  loadData::loadPtreeValue(pt, this->modelFolderCppAd, prefix + "modelFolderCppAd", verbose);
 
   loadData::loadStdVector(configFile, prefix + "fixedJointNames", fixedJointNames, verbose);
   loadData::loadStdVector(configFile, prefix + "contactNames6DoF", contactNames6DoF, verbose);

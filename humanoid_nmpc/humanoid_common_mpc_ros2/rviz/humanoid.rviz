@@ -12,12 +12,12 @@ Panels:
         - /TF1/Frames1
         - /Cartesian Markers1
         - /Cartesian Markers1/Namespaces1
-        - /Hand Pose Markers1
         - /OptimizedStateTrajectory1
+        - /Hand Pose Markers1
         - /Terminal Target RobotModel1
         - /CollisionMarkerArray1
       Splitter Ratio: 0.5
-    Tree Height: 549
+    Tree Height: 466
   - Class: rviz_common/Views
     Expanded:
       - /Current View1
@@ -268,8 +268,6 @@ Visualization Manager:
       Visual Enabled: true
     - Class: rviz_default_plugins/TF
       Enabled: false
-      Filter (blacklist): ""
-      Filter (whitelist): ""
       Frame Timeout: 15
       Frames:
         All Enabled: true
@@ -286,6 +284,8 @@ Visualization Manager:
       Enabled: true
       Name: Cartesian Markers
       Namespaces:
+        Center of Pressure: true
+        EE Forces: true
         equivalentContactCornerForces: false
       Topic:
         Depth: 5
@@ -403,7 +403,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 2.4502856731414795
+      Distance: 1.9200164079666138
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -418,20 +418,20 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.36879807710647583
+      Pitch: 0.2987978160381317
       Target Frame: pelvis
       Value: Orbit (rviz)
-      Yaw: 6.122678756713867
+      Yaw: 4.287672996520996
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1135
+  Height: 1016
   Hide Left Dock: false
   Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd00000001000000000000029d00000417fc0200000003fb000000100044006900730070006c006100790073010000003c000002eb000000c800fffffffb0000000c00430061006d0065007200610100000725000000e90000000000000000fb0000000a00560069006500770073010000032d00000126000000a200ffffff000004dd0000041700000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000001000000000000029d000003a2fc0200000003fb000000100044006900730070006c006100790073010000003b00000297000000c700fffffffb0000000c00430061006d0065007200610100000725000000e90000000000000000fb0000000a0056006900650077007301000002d800000105000000a000ffffff0000049f000003a200000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Views:
     collapsed: false
-  Width: 1920
-  X: 876
-  Y: 360
+  Width: 1858
+  X: 62
+  Y: 27
