@@ -48,18 +48,24 @@ EndEffectorKinematicsQuadraticCost::EndEffectorKinematicsQuadraticCost(EndEffect
                                                                        std::string endEffectorName,
                                                                        const ModelSettings& modelSettings,
                                                                        std::shared_ptr<HandPoseReferenceManager> handPoseReferenceManagerPtr,
-                                                                       std::string handPoseReferenceName)
+                                                                       std::string handPoseReferenceName,
+                                                                       std::string referenceFrameName)
     : StateInputCostGaussNewtonAd(),
       sqrtWeights_(weights.toVector().cwiseSqrt()),
+      pinocchioInterface_(pinocchioInterface),
       endEffectorKinematicsPtr_(endEffectorKinematics.clone()),
       pinocchioInterfaceCppAd_(pinocchioInterface.toCppAd()),
       mpcRobotModelPtr(mpcRobotModel.clone()),
       mpcRobotModelADPtr(mpcRobotModelAD.clone()),
       handPoseReferenceManagerPtr_(std::move(handPoseReferenceManagerPtr)),
-      handPoseReferenceName_(std::move(handPoseReferenceName)) {
+      handPoseReferenceName_(std::move(handPoseReferenceName)),
+      referenceFrameName_(std::move(referenceFrameName)) {
   std::cout << "Initialized EndEffectorKinematicsQuadraticCost with weights: " << weights.toVector().transpose() << std::endl;
   std::cout << "Frame name: " << endEffectorName << std::endl;
   frameID_ = pinocchioInterface.getModel().getFrameId(endEffectorName);
+  if (!referenceFrameName_.empty()) {
+    referenceFrameID_ = pinocchioInterface.getModel().getFrameId(referenceFrameName_);
+  }
   std::cout << "Frame ID: " << frameID_ << std::endl;
   std::cout << "State dim: " << mpcRobotModelADPtr->getStateDim() << std::endl;
   std::cout << "Input dim: " << mpcRobotModelADPtr->getInputDim() << std::endl;
@@ -79,12 +85,15 @@ EndEffectorKinematicsQuadraticCost::EndEffectorKinematicsQuadraticCost(const End
       sqrtWeights_(other.sqrtWeights_),
       n_parameters_(other.n_parameters_),
       frameID_(other.frameID_),
+      referenceFrameID_(other.referenceFrameID_),
+      pinocchioInterface_(other.pinocchioInterface_),
       pinocchioInterfaceCppAd_(other.pinocchioInterfaceCppAd_),
       endEffectorKinematicsPtr_(other.endEffectorKinematicsPtr_->clone()),
       mpcRobotModelPtr(other.mpcRobotModelPtr->clone()),
       mpcRobotModelADPtr(other.mpcRobotModelADPtr->clone()),
       handPoseReferenceManagerPtr_(other.handPoseReferenceManagerPtr_),
-      handPoseReferenceName_(other.handPoseReferenceName_) {}
+      handPoseReferenceName_(other.handPoseReferenceName_),
+      referenceFrameName_(other.referenceFrameName_) {}
 
 /******************************************************************************************************/
 /******************************************************************************************************/
@@ -126,14 +135,17 @@ EndEffectorKinematicsCostElement<scalar_t> EndEffectorKinematicsQuadraticCost::g
 /******************************************************************************************************/
 
 EndEffectorKinematicsCostElement<scalar_t> EndEffectorKinematicsQuadraticCost::getExternalReferenceCostElement(
-    const vector_t& state, const vector_t& input, const HandPoseReference& pelvisFrameReference) const {
+    const vector_t& state, const vector_t& input, const HandPoseReference& referenceFrameReference) const {
   EndEffectorKinematicsCostElement<scalar_t> costElement = getReferenceCostElement(state, input, *endEffectorKinematicsPtr_);
 
-  const vector6_t basePose = mpcRobotModelPtr->getBasePose(state);
-  const vector3_t baseEulerZyx = basePose.tail<3>();
-  const quaternion_t orientationWorldToPelvis = getQuaternionFromEulerAnglesZyx(baseEulerZyx);
-  costElement.setPosition(basePose.head<3>() + orientationWorldToPelvis * pelvisFrameReference.positionInPelvis);
-  costElement.setOrientation(orientationWorldToPelvis * pelvisFrameReference.orientationPelvisToHand);
+  auto& model = pinocchioInterface_.getModel();
+  auto& data = pinocchioInterface_.getData();
+  pinocchio::forwardKinematics(model, data, mpcRobotModelPtr->getGeneralizedCoordinates(state));
+  pinocchio::updateFramePlacements(model, data);
+  const auto& referenceFramePose = data.oMf[referenceFrameID_];
+  const quaternion_t orientationWorldToReference(referenceFramePose.rotation());
+  costElement.setPosition(referenceFramePose.translation() + orientationWorldToReference * referenceFrameReference.positionInReferenceFrame);
+  costElement.setOrientation(orientationWorldToReference * referenceFrameReference.orientationReferenceToHand);
 
   return costElement;
 }

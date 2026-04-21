@@ -31,12 +31,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
 #include <tf2_ros/transform_broadcaster.h>
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <interactive_markers/interactive_marker_server.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
+#include <mutex>
+#include <string>
 #include <utility>
+#include <vector>
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
+#include <visualization_msgs/msg/interactive_marker_feedback.hpp>
 
 #include <ocs2_core/Types.h>
 #include <ocs2_robotic_tools/common/RotationTransforms.h>
@@ -114,12 +120,33 @@ class HumanoidVisualizer : public DummyObserver {
 
   void publishSelfCollisionMarkers(const contact_flag_t& contactFlags, const vector_t& state) const;
 
+  void initializeHandInteractiveMarkers(const std::string& taskFile);
+
+  void updateHandInteractiveMarkers();
+
+  void processHandInteractiveMarkerFeedback(const std::string& markerName,
+                                            const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback);
+
   scalar_t lastTime_ = 0.0;
   scalar_t minPublishTimeDifference_;
 
   PinocchioInterface pinocchioInterface_;
   const EquivalentContactCornerForcesVisualizer contactVisualizer_;
   const MpcRobotModelBase<scalar_t>* mpcRobotModelPtr_;
+
+  struct HandInteractiveMarker {
+    std::string markerName;
+    std::string referenceName;
+    std::string linkName;
+    std::string referenceFrameName;
+    geometry_msgs::msg::Pose poseInReferenceFrame = []() {
+      geometry_msgs::msg::Pose pose;
+      pose.orientation.w = 1.0;
+      return pose;
+    }();
+    bool initialized = false;
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr publisher;
+  };
 
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr jointPublisherPtr_{};
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr terminalJointPublisherPtr_{};
@@ -134,6 +161,9 @@ class HumanoidVisualizer : public DummyObserver {
   vector_t prevPolicyInput;
 
   FootCollisionConstraint::Config collisionConfig_;
+  std::unique_ptr<interactive_markers::InteractiveMarkerServer> handInteractiveMarkerServerPtr_{};
+  std::vector<HandInteractiveMarker> handInteractiveMarkers_;
+  mutable std::mutex handInteractiveMarkersMutex_;
 
   const std::string base_link_name_;
 };

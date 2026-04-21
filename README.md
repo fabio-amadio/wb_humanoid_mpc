@@ -123,7 +123,9 @@ For the **Centroidal Dynamics MPC with Cartesian hand pose references**
 make launch-g1-dummy-sim-hands-cartesian
 ```
 
-The hand references are expressed in the `pelvis` frame and can be sent through ROS 2 topics. To send commands while the simulation is running, open another terminal in the same Docker container. If you are using VS Code Dev Containers, open a new integrated terminal.
+The hand references are expressed in the `torso_link` frame and can be sent through ROS 2 topics. To send commands while the simulation is running, open another terminal in the same Docker container. If you are using VS Code Dev Containers, open a new integrated terminal.
+
+The RViz config now also includes 6-DoF interactive markers under `Hand Pose Markers`. Dragging or rotating them publishes the same `torso_link`-frame references to `/g1/left_hand_pose_reference` and `/g1/right_hand_pose_reference`.
 
 ```bash
  docker exec -it wb-mpc-dev bash
@@ -133,7 +135,7 @@ Then send a right hand pose reference:
 
 ```bash
 ros2 topic pub --once /g1/right_hand_pose_reference geometry_msgs/msg/PoseStamped "{
-  header: {frame_id: 'pelvis'},
+  header: {frame_id: 'torso_link'},
   pose: {
     position: {x: 0.250, y: -0.150, z: 0.10},
     orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
@@ -145,7 +147,7 @@ Another example target is:
 
 ```bash
 ros2 topic pub --once /g1/right_hand_pose_reference geometry_msgs/msg/PoseStamped "{
-  header: {frame_id: 'pelvis'},
+  header: {frame_id: 'torso_link'},
   pose: {
     position: {x: 0.35, y: -0.200, z: 0.20},
     orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
@@ -156,10 +158,10 @@ ros2 topic pub --once /g1/right_hand_pose_reference geometry_msgs/msg/PoseStampe
 You can check the tracked hand pose with:
 
 ```bash
-ros2 run tf2_ros tf2_echo pelvis right_rubber_hand
+ros2 run tf2_ros tf2_echo torso_link right_rubber_hand
 ```
 
-To publish MPC references for a downstream CLAMP/RL WBC, launch the centroidal dummy sim with:
+To publish MPC references for a downstream RL-based WBC, launch the centroidal dummy sim with:
 
 ```bash
 make launch-g1-dummy-sim-mpc-motion-reference

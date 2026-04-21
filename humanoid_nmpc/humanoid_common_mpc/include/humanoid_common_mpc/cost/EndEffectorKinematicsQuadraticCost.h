@@ -36,6 +36,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ocs2_core/cost/StateInputGaussNewtonCostAd.h>
 #include <ocs2_pinocchio_interface/PinocchioInterface.h>
 #include <ocs2_robotic_tools/end_effector/EndEffectorKinematics.h>
+#include <pinocchio/algorithm/kinematics.hpp>
 #include <pinocchio/algorithm/frames.hpp>
 
 #include "humanoid_common_mpc/common/ModelSettings.h"
@@ -56,7 +57,8 @@ class EndEffectorKinematicsQuadraticCost : public ocs2::StateInputCostGaussNewto
                                      std::string endEffectorName,
                                      const ModelSettings& modelSettings,
                                      std::shared_ptr<HandPoseReferenceManager> handPoseReferenceManagerPtr = nullptr,
-                                     std::string handPoseReferenceName = "");
+                                     std::string handPoseReferenceName = "",
+                                     std::string referenceFrameName = "");
 
   ~EndEffectorKinematicsQuadraticCost() override = default;
   EndEffectorKinematicsQuadraticCost* clone() const override { return new EndEffectorKinematicsQuadraticCost(*this); }
@@ -83,7 +85,7 @@ class EndEffectorKinematicsQuadraticCost : public ocs2::StateInputCostGaussNewto
 
   EndEffectorKinematicsCostElement<scalar_t> getExternalReferenceCostElement(const vector_t& state,
                                                                              const vector_t& input,
-                                                                             const HandPoseReference& pelvisFrameReference) const;
+                                                                             const HandPoseReference& referenceFrameReference) const;
 
   ad_vector_t costVectorFunction(ad_scalar_t time,
                                  const ad_vector_t& state,
@@ -93,12 +95,15 @@ class EndEffectorKinematicsQuadraticCost : public ocs2::StateInputCostGaussNewto
   vector12_t sqrtWeights_;
   size_t n_parameters_ = 25;
   pinocchio::FrameIndex frameID_;
+  pinocchio::FrameIndex referenceFrameID_{0};
+  mutable PinocchioInterface pinocchioInterface_;
   PinocchioInterfaceCppAd pinocchioInterfaceCppAd_;
   const std::unique_ptr<EndEffectorKinematics<scalar_t>> endEffectorKinematicsPtr_;
   std::unique_ptr<MpcRobotModelBase<scalar_t>> mpcRobotModelPtr;
   std::unique_ptr<MpcRobotModelBase<ad_scalar_t>> mpcRobotModelADPtr;
   std::shared_ptr<HandPoseReferenceManager> handPoseReferenceManagerPtr_;
   std::string handPoseReferenceName_;
+  std::string referenceFrameName_;
   bool isActive_ = true;
 };
 

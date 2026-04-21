@@ -74,8 +74,8 @@ void Ros2ProceduralMpcMotionManager::subscribe(rclcpp::Node::SharedPtr nodeHandl
 
 void Ros2ProceduralMpcMotionManager::setHandPoseReference(const std::string& referenceName, const geometry_msgs::msg::PoseStamped& msg) {
   HandPoseReference reference;
-  reference.positionInPelvis << msg.pose.position.x, msg.pose.position.y, msg.pose.position.z;
-  reference.orientationPelvisToHand =
+  reference.positionInReferenceFrame << msg.pose.position.x, msg.pose.position.y, msg.pose.position.z;
+  reference.orientationReferenceToHand =
       quaternion_t(msg.pose.orientation.w, msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z).normalized();
   switchedModelReferenceManagerPtr_->getHandPoseReferenceManagerPtr()->setReference(referenceName, reference);
 }

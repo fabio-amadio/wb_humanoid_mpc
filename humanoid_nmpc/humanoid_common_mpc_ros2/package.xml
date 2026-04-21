@@ -19,6 +19,7 @@
   <depend>kdl_parser</depend>
   <depend>visualization_msgs</depend>
   <depend>geometry_msgs</depend>
+  <depend>interactive_markers</depend>
   <depend>sensor_msgs</depend>
   <depend>ocs2_ros2_interfaces</depend>
   <depend>ocs2_ros2_msgs</depend>

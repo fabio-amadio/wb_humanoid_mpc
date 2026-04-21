@@ -350,6 +350,13 @@ void CentroidalMpcInterface::addTaskSpaceKinematicsCosts(
 
     bool usePelvisFrameReference = false;
     loadData::loadPtreeValue(task_space_costs_pt, usePelvisFrameReference, costName + ".pelvis_frame_pose_reference", verbose_);
+    std::string referenceFrameName;
+    if (const auto referenceFrameNameOptional = task_space_costs_pt.get_optional<std::string>(costName + ".reference_frame_link_name")) {
+      referenceFrameName = *referenceFrameNameOptional;
+    }
+    if (usePelvisFrameReference && referenceFrameName.empty()) {
+      referenceFrameName = pinocchioInterfacePtr_->getModel().frames[((pinocchio::FrameIndex)2)].name;
+    }
 
     std::shared_ptr<HandPoseReferenceManager> handPoseReferenceManagerPtr = nullptr;
     std::string handPoseReferenceName;
@@ -357,23 +364,28 @@ void CentroidalMpcInterface::addTaskSpaceKinematicsCosts(
       const auto defaultCostElement =
           EndEffectorKinematicsQuadraticCost::getReferenceCostElement(initialState_, vector_t::Zero(centroidalModelInfo_.inputDim),
                                                                       *eeKinematicsPtr);
-      const vector6_t basePose = mpcRobotModelPtr_->getBasePose(initialState_);
-      const vector3_t baseEulerZyx = basePose.tail<3>();
-      const quaternion_t orientationBaseToWorld = getQuaternionFromEulerAnglesZyx(baseEulerZyx);
+      auto& model = pinocchioInterfacePtr_->getModel();
+      auto& data = pinocchioInterfacePtr_->getData();
+      pinocchio::forwardKinematics(model, data, mpcRobotModelPtr_->getGeneralizedCoordinates(initialState_));
+      pinocchio::updateFramePlacements(model, data);
+      const auto& referenceFramePose = data.oMf[model.getFrameId(referenceFrameName)];
+      const quaternion_t orientationWorldToReference(referenceFramePose.rotation());
 
       HandPoseReference defaultReference;
-      defaultReference.positionInPelvis = orientationBaseToWorld.inverse() * (defaultCostElement.getPosition() - basePose.head<3>());
-      defaultReference.orientationPelvisToHand = orientationBaseToWorld.inverse() * defaultCostElement.getOrientation();
+      defaultReference.positionInReferenceFrame =
+          orientationWorldToReference.inverse() * (defaultCostElement.getPosition() - referenceFramePose.translation());
+      defaultReference.orientationReferenceToHand = orientationWorldToReference.inverse() * defaultCostElement.getOrientation();
 
       handPoseReferenceManagerPtr = referenceManagerPtr_->getHandPoseReferenceManagerPtr();
       handPoseReferenceName = costName;
       handPoseReferenceManagerPtr->setReference(handPoseReferenceName, defaultReference);
-      std::cout << "Initialized pelvis-frame pose reference for task `" << handPoseReferenceName << "`" << std::endl;
+      std::cout << "Initialized reference-frame pose reference for task `" << handPoseReferenceName << "` in frame `"
+                << referenceFrameName << "`" << std::endl;
     }
 
     std::unique_ptr<StateInputCost> cost = std::make_unique<EndEffectorKinematicsQuadraticCost>(
         weights, *pinocchioInterfacePtr_, *eeKinematicsPtr, *mpcRobotModelPtr_, *mpcRobotModelADPtr_, linkName, modelSettings_,
-        handPoseReferenceManagerPtr, handPoseReferenceName);
+        handPoseReferenceManagerPtr, handPoseReferenceName, referenceFrameName);
 
     problemPtr_->costPtr->add(costName + "_TaskSpaceKinematicsCost", std::move(cost));
 

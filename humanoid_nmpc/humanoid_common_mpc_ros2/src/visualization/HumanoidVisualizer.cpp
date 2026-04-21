@@ -37,8 +37,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pinocchio/multibody/data.hpp>
 #include <pinocchio/multibody/model.hpp>
 
+#include <boost/property_tree/info_parser.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
+#include <visualization_msgs/msg/interactive_marker.hpp>
+#include <visualization_msgs/msg/interactive_marker_control.hpp>
 
 #include "humanoid_common_mpc_ros2/visualization/HumanoidVisualizer.h"
 
@@ -55,6 +58,37 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <kdl_parser/kdl_parser.hpp>
 
 namespace ocs2::humanoid {
+
+namespace {
+
+geometry_msgs::msg::Pose toPoseMsg(const vector3_t& position, const quaternion_t& orientation) {
+  geometry_msgs::msg::Pose pose;
+  pose.position.x = position.x();
+  pose.position.y = position.y();
+  pose.position.z = position.z();
+  pose.orientation.x = orientation.x();
+  pose.orientation.y = orientation.y();
+  pose.orientation.z = orientation.z();
+  pose.orientation.w = orientation.w();
+  return pose;
+}
+
+visualization_msgs::msg::InteractiveMarkerControl makeAxisControl(const std::string& name,
+                                                                  uint8_t interactionMode,
+                                                                  double x,
+                                                                  double y,
+                                                                  double z) {
+  visualization_msgs::msg::InteractiveMarkerControl control;
+  control.name = name;
+  control.orientation.w = 1.0;
+  control.orientation.x = x;
+  control.orientation.y = y;
+  control.orientation.z = z;
+  control.interaction_mode = interactionMode;
+  return control;
+}
+
+}  // namespace
 
 /******************************************************************************************************/
 /******************************************************************************************************/
@@ -74,6 +108,7 @@ HumanoidVisualizer::HumanoidVisualizer(const std::string& taskFile,
       node_handle_(std::move(nodeHandle)) {
   // launchSubscribers();
   createVisualizationPublishers();
+  initializeHandInteractiveMarkers(taskFile);
   prevPolicyState = vector_t::Zero(mpcRobotModelPtr_->getStateDim());
   prevPolicyInput = vector_t::Zero(mpcRobotModelPtr_->getInputDim());
 
@@ -112,6 +147,167 @@ void HumanoidVisualizer::createVisualizationPublishers() {
   markerPublisherPtr_ = node_handle_->create_publisher<visualization_msgs::msg::MarkerArray>("cartesian_markers", 1);
   collsisionMarkerPublisherPtr_ = node_handle_->create_publisher<visualization_msgs::msg::MarkerArray>("collision_markers", 1);
   stateOptimizedPublisherPtr_ = node_handle_->create_publisher<visualization_msgs::msg::MarkerArray>("optimized_state_markers", 1);
+}
+
+/******************************************************************************************************/
+/******************************************************************************************************/
+/******************************************************************************************************/
+
+void HumanoidVisualizer::initializeHandInteractiveMarkers(const std::string& taskFile) {
+  boost::property_tree::ptree pt;
+  boost::property_tree::read_info(taskFile, pt);
+
+  const auto taskSpaceCostsOptional = pt.get_child_optional("task_space_costs");
+  if (!taskSpaceCostsOptional) {
+    return;
+  }
+
+  const auto maybeAddHandMarker = [this, &taskSpaceCostsOptional](const std::string& referenceName, const std::string& colorName,
+                                                                  const Color& color) {
+    const auto handTaskOptional = taskSpaceCostsOptional->get_child_optional(referenceName);
+    if (!handTaskOptional) {
+      return;
+    }
+
+    const bool usePelvisFrameReference = handTaskOptional->get<bool>("pelvis_frame_pose_reference", false);
+    const std::string linkName = handTaskOptional->get<std::string>("link_name", "");
+    const std::string referenceFrameName = handTaskOptional->get<std::string>("reference_frame_link_name", base_link_name_);
+    if (!usePelvisFrameReference || linkName.empty() || !pinocchioInterface_.getModel().existFrame(linkName)) {
+      return;
+    }
+
+    if (!handInteractiveMarkerServerPtr_) {
+      handInteractiveMarkerServerPtr_ =
+          std::make_unique<interactive_markers::InteractiveMarkerServer>("hand_pose_markers", node_handle_);
+    }
+
+    HandInteractiveMarker handMarker;
+    handMarker.referenceName = referenceName;
+    handMarker.markerName = referenceName + "_interactive_marker";
+    handMarker.linkName = linkName;
+    handMarker.referenceFrameName = referenceFrameName;
+    handMarker.publisher = node_handle_->create_publisher<geometry_msgs::msg::PoseStamped>(
+        "/" + mpcRobotModelPtr_->modelSettings.robotName + "/" + referenceName + "_pose_reference", 1);
+
+    handInteractiveMarkers_.push_back(std::move(handMarker));
+
+    RCLCPP_INFO(node_handle_->get_logger(), "Enabled %s interactive marker for link `%s` on topic `%s`.", colorName.c_str(),
+                linkName.c_str(), ("/" + mpcRobotModelPtr_->modelSettings.robotName + "/" + referenceName + "_pose_reference").c_str());
+  };
+
+  maybeAddHandMarker("left_hand", "left hand", Color::blue);
+  maybeAddHandMarker("right_hand", "right hand", Color::orange);
+
+  if (handInteractiveMarkerServerPtr_) {
+    handInteractiveMarkerServerPtr_->applyChanges();
+  }
+}
+
+/******************************************************************************************************/
+/******************************************************************************************************/
+/******************************************************************************************************/
+
+void HumanoidVisualizer::updateHandInteractiveMarkers() {
+  if (!handInteractiveMarkerServerPtr_) {
+    return;
+  }
+
+  const auto& model = pinocchioInterface_.getModel();
+  const auto& data = pinocchioInterface_.getData();
+  std::scoped_lock lock(handInteractiveMarkersMutex_);
+  bool didChange = false;
+
+  for (auto& handMarker : handInteractiveMarkers_) {
+    if (handMarker.initialized) {
+      continue;
+    }
+
+    const pinocchio::FrameIndex referenceFrameIndex = model.getFrameId(handMarker.referenceFrameName);
+    const pinocchio::FrameIndex handFrameIndex = model.getFrameId(handMarker.linkName);
+    const pinocchio::SE3 referenceToHand = data.oMf[referenceFrameIndex].inverse() * data.oMf[handFrameIndex];
+    const quaternion_t referenceOrientationToHand(referenceToHand.rotation());
+    handMarker.poseInReferenceFrame = toPoseMsg(referenceToHand.translation(), referenceOrientationToHand.normalized());
+
+    visualization_msgs::msg::InteractiveMarker marker;
+    marker.header.frame_id = handMarker.referenceFrameName;
+    marker.name = handMarker.markerName;
+    marker.description = handMarker.referenceName + " pose";
+    marker.scale = 0.14;
+    marker.pose = handMarker.poseInReferenceFrame;
+
+    visualization_msgs::msg::InteractiveMarkerControl visualControl;
+    visualControl.always_visible = true;
+    visualControl.orientation_mode = visualization_msgs::msg::InteractiveMarkerControl::INHERIT;
+    visualization_msgs::msg::Marker sphere;
+    sphere.type = visualization_msgs::msg::Marker::SPHERE;
+    sphere.scale.x = 0.035;
+    sphere.scale.y = 0.035;
+    sphere.scale.z = 0.035;
+    sphere.color = getColor(handMarker.referenceName == "left_hand" ? Color::blue : Color::orange);
+    sphere.color.a = 0.85;
+    visualControl.markers.push_back(sphere);
+    marker.controls.push_back(visualControl);
+
+    marker.controls.push_back(makeAxisControl("move_x", visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS, 1.0, 0.0, 0.0));
+    marker.controls.push_back(
+        makeAxisControl("move_y", visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS, 0.0, 0.0, 1.0));
+    marker.controls.push_back(
+        makeAxisControl("move_z", visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS, 0.0, 1.0, 0.0));
+    marker.controls.push_back(
+        makeAxisControl("rotate_x", visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS, 1.0, 0.0, 0.0));
+    marker.controls.push_back(
+        makeAxisControl("rotate_y", visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS, 0.0, 0.0, 1.0));
+    marker.controls.push_back(
+        makeAxisControl("rotate_z", visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS, 0.0, 1.0, 0.0));
+
+    handInteractiveMarkerServerPtr_->insert(
+        marker, [this, markerName = handMarker.markerName](
+                    const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback) {
+          this->processHandInteractiveMarkerFeedback(markerName, feedback);
+        });
+
+    handMarker.initialized = true;
+    didChange = true;
+
+    geometry_msgs::msg::PoseStamped referenceMsg;
+    referenceMsg.header.stamp = node_handle_->now();
+    referenceMsg.header.frame_id = handMarker.referenceFrameName;
+    referenceMsg.pose = handMarker.poseInReferenceFrame;
+    handMarker.publisher->publish(referenceMsg);
+  }
+
+  if (didChange) {
+    handInteractiveMarkerServerPtr_->applyChanges();
+  }
+}
+
+/******************************************************************************************************/
+/******************************************************************************************************/
+/******************************************************************************************************/
+
+void HumanoidVisualizer::processHandInteractiveMarkerFeedback(
+    const std::string& markerName, const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback) {
+  if (!feedback || (feedback->event_type != visualization_msgs::msg::InteractiveMarkerFeedback::POSE_UPDATE &&
+                    feedback->event_type != visualization_msgs::msg::InteractiveMarkerFeedback::MOUSE_UP)) {
+    return;
+  }
+
+  std::scoped_lock lock(handInteractiveMarkersMutex_);
+  for (auto& handMarker : handInteractiveMarkers_) {
+    if (handMarker.markerName != markerName) {
+      continue;
+    }
+
+    handMarker.poseInReferenceFrame = feedback->pose;
+    handMarker.initialized = true;
+
+    geometry_msgs::msg::PoseStamped referenceMsg;
+    referenceMsg.header.stamp = feedback->header.stamp;
+    referenceMsg.header.frame_id = feedback->header.frame_id.empty() ? handMarker.referenceFrameName : feedback->header.frame_id;
+    referenceMsg.pose = feedback->pose;
+    handMarker.publisher->publish(referenceMsg);
+    break;
+  }
 }
 
 /******************************************************************************************************/
@@ -387,6 +583,7 @@ void HumanoidVisualizer::publishOptimizedStateTrajectory(const scalar_array_t& m
 void HumanoidVisualizer::update(const SystemObservation& observation, const PrimalSolution& policy, const CommandData& command) {
   if (observation.time - lastTime_ > minPublishTimeDifference_) {
     updatePinocchioFrames(vector_t(observation.state));
+    updateHandInteractiveMarkers();
     scalar_t groundHeight = getGroundHeightEstimate(pinocchioInterface_, *mpcRobotModelPtr_, observation.mode);
     publishObservation(observation);
     publishCartesianMarkers(modeNumber2StanceLeg(observation.mode), observation.state, observation.input);

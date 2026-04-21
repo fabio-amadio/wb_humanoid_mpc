@@ -12,6 +12,7 @@ Panels:
         - /TF1/Frames1
         - /Cartesian Markers1
         - /Cartesian Markers1/Namespaces1
+        - /Hand Pose Markers1
         - /OptimizedStateTrajectory1
         - /Terminal Target RobotModel1
         - /CollisionMarkerArray1
@@ -307,6 +308,15 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /optimized_state_markers
+      Value: true
+    - Class: rviz_default_plugins/InteractiveMarkers
+      Enable Transparency: true
+      Enabled: true
+      Interactive Markers Namespace: /hand_pose_markers
+      Name: Hand Pose Markers
+      Show Axes: true
+      Show Descriptions: false
+      Show Visual Aids: false
       Value: true
     - Alpha: 0.4000000059604645
       Class: rviz_default_plugins/RobotModel

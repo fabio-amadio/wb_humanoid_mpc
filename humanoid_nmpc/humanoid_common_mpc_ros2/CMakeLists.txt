@@ -18,6 +18,7 @@ find_package(urdf REQUIRED)
 find_package(kdl_parser REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(interactive_markers REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(ocs2_ros2_interfaces REQUIRED)
 find_package(ocs2_ros2_msgs REQUIRED)
@@ -66,6 +67,7 @@ set(dependencies
     kdl_parser
     visualization_msgs
     geometry_msgs
+    interactive_markers
     sensor_msgs
     ocs2_ros2_interfaces
     ocs2_ros2_msgs
@@ -161,4 +163,3 @@ ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})
 ament_export_dependencies(${dependencies})
 ament_package()
-

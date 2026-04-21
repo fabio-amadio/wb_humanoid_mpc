@@ -33,12 +33,6 @@ model_settings
   ; Exclude these joints from MPC model
   fixedJointNames
   {
-    [0] "left_wrist_roll_joint"
-    [1] "left_wrist_pitch_joint"
-    [2] "left_wrist_yaw_joint"
-    [3] "right_wrist_roll_joint"
-    [4] "right_wrist_pitch_joint"
-    [5] "right_wrist_yaw_joint"
   }
   
   ; Pinocchio Frame names for the contact frames
@@ -158,10 +152,16 @@ initialState
   (28,0)  0.0       ; left_shoulder_roll_joint
   (29,0)  0.0       ; left_shoulder_yaw_joint
   (30,0)  0.0       ; left_elbow_joint
-  (31,0)  0.0       ; right_shoulder_pitch_joint
-  (32,0)  0.0       ; right_shoulder_roll_joint
-  (33,0)  0.0       ; right_shoulder_yaw_joint
-  (34,0)  0.0       ; right_elbow_joint
+  (31,0)  0.0       ; left_wrist_roll_joint
+  (32,0)  0.0       ; left_wrist_pitch_joint
+  (33,0)  0.0       ; left_wrist_yaw_joint
+  (34,0)  0.0       ; right_shoulder_pitch_joint
+  (35,0)  0.0       ; right_shoulder_roll_joint
+  (36,0)  0.0       ; right_shoulder_yaw_joint
+  (37,0)  0.0       ; right_elbow_joint
+  (38,0)  0.0       ; right_wrist_roll_joint
+  (39,0)  0.0       ; right_wrist_pitch_joint
+  (40,0)  0.0       ; right_wrist_yaw_joint
 }
 
 ; standard state weight matrix
@@ -206,10 +206,16 @@ Q
   (28,28) 0.0      ;    left_shoulder_roll_joint
   (29,29) 0.0      ;    left_shoulder_yaw_joint
   (30,30) 0.0      ;    left_elbow_joint
-  (31,31) 0.0      ;    right_shoulder_pitch_joint
-  (32,32) 0.0      ;    right_shoulder_roll_joint
-  (33,33) 0.0      ;    right_shoulder_yaw_joint
-  (34,34) 0.0      ;    right_elbow_joint
+  (31,31) 0.1      ;    left_wrist_roll_joint
+  (32,32) 0.1      ;    left_wrist_pitch_joint
+  (33,33) 0.1      ;    left_wrist_yaw_joint
+  (34,34) 0.0      ;    right_shoulder_pitch_joint
+  (35,35) 0.0      ;    right_shoulder_roll_joint
+  (36,36) 0.0      ;    right_shoulder_yaw_joint
+  (37,37) 0.0      ;    right_elbow_joint
+  (38,38) 0.1      ;    right_wrist_roll_joint
+  (39,39) 0.1      ;    right_wrist_pitch_joint
+  (40,40) 0.1      ;    right_wrist_yaw_joint
 
 }
 
@@ -252,10 +258,16 @@ R
   (28,28) 100.0      ;    left_shoulder_roll_joint
   (29,29) 100.0      ;    left_shoulder_yaw_joint
   (30,30) 200.0      ;    left_elbow_joint
-  (31,31) 200.0      ;    right_shoulder_pitch_joint
-  (32,32) 100.0      ;    right_shoulder_roll_joint
-  (33,33) 100.0      ;    right_shoulder_yaw_joint
-  (34,34) 200.0      ;    right_elbow_joint
+  (31,31) 5.0      ;    left_wrist_roll_joint
+  (32,32) 5.0      ;    left_wrist_pitch_joint
+  (33,33) 5.0      ;    left_wrist_yaw_joint
+  (34,34) 200.0      ;    right_shoulder_pitch_joint
+  (35,35) 100.0      ;    right_shoulder_roll_joint
+  (36,36) 100.0      ;    right_shoulder_yaw_joint
+  (37,37) 200.0      ;    right_elbow_joint
+  (38,38) 5.0      ;    right_wrist_roll_joint
+  (39,39) 5.0      ;    right_wrist_pitch_joint
+  (40,40) 5.0      ;    right_wrist_yaw_joint
 }
 
 terminalCostScaling       3.0
@@ -300,10 +312,16 @@ Q_final
   (28,28) 0.0      ;    left_shoulder_roll_joint
   (29,29) 0.0      ;    left_shoulder_yaw_joint
   (30,30) 0.0      ;    left_elbow_joint
-  (31,31) 0.0      ;    right_shoulder_pitch_joint
-  (32,32) 0.0      ;    right_shoulder_roll_joint
-  (33,33) 0.0      ;    right_shoulder_yaw_joint
-  (34,34) 0.0      ;    right_elbow_joint
+  (31,31) 0.1      ;    left_wrist_roll_joint
+  (32,32) 0.1      ;    left_wrist_pitch_joint
+  (33,33) 0.1      ;    left_wrist_yaw_joint
+  (34,34) 0.0      ;    right_shoulder_pitch_joint
+  (35,35) 0.0      ;    right_shoulder_roll_joint
+  (36,36) 0.0      ;    right_shoulder_yaw_joint
+  (37,37) 0.0      ;    right_elbow_joint
+  (38,38) 0.1      ;    right_wrist_roll_joint
+  (39,39) 0.1      ;    right_wrist_pitch_joint
+  (40,40) 0.1      ;    right_wrist_yaw_joint
 }
 
 icp_cost_weights
@@ -372,13 +390,14 @@ task_space_costs
   left_hand {
     link_name     left_rubber_hand
     pelvis_frame_pose_reference true
+    reference_frame_link_name torso_link
     weights {
-      pos_x               150.0
-      pos_y               150.0
-      pos_z               150.0
-      orientation_x       1.0
-      orientation_y       1.0
-      orientation_z       1.0
+      pos_x               500.0
+      pos_y               500.0
+      pos_z               500.0
+      orientation_x       500.0
+      orientation_y       500.0
+      orientation_z       500.0
       lin_velocity_x      0.5
       lin_velocity_y      0.5
       lin_velocity_z      0.5
@@ -397,13 +416,14 @@ task_space_costs
   right_hand {
     link_name     right_rubber_hand
     pelvis_frame_pose_reference true
+    reference_frame_link_name torso_link
     weights {
-      pos_x               150.0
-      pos_y               150.0
-      pos_z               150.0
-      orientation_x       1.0
-      orientation_y       1.0
-      orientation_z       1.0
+      pos_x               500.0
+      pos_y               500.0
+      pos_z               500.0
+      orientation_x       500.0
+      orientation_y       500.0
+      orientation_z       500.0
       lin_velocity_x      0.5
       lin_velocity_y      0.5
       lin_velocity_z      0.5

@@ -24,10 +24,10 @@ model_settings
   }
 
   phaseTransitionStanceTime       0.0
-  armSwingReferenceActive         true
+  armSwingReferenceActive         false
 
   verboseCppAd                  true
-  recompileLibrariesCppAd       false
+  recompileLibrariesCppAd       true
   modelFolderCppAd              build/centroidal_mpc_cppad_autocode_gen
 
   ; Exclude these joints from MPC model

@@ -16,8 +16,8 @@ namespace ocs2::humanoid {
 
 struct HandPoseReference {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  vector3_t positionInPelvis = vector3_t::Zero();
-  quaternion_t orientationPelvisToHand = quaternion_t::Identity();
+  vector3_t positionInReferenceFrame = vector3_t::Zero();
+  quaternion_t orientationReferenceToHand = quaternion_t::Identity();
 };
 
 class HandPoseReferenceManager {
