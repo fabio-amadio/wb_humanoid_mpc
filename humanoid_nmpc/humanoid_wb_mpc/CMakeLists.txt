@@ -29,7 +29,7 @@ find_package(Boost REQUIRED COMPONENTS
   log_setup
 )
 
-# find_package(PkgConfig REQUIRED)
+find_package(PkgConfig REQUIRED)
 pkg_check_modules(pinocchio REQUIRED pinocchio)
 
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
