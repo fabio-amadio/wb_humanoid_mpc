@@ -9,6 +9,8 @@ from launch.substitutions import Command, LaunchConfiguration
 
 
 ROBOT_DESCRIPTION_TOPIC = "/mpc/robot_description"
+TERMINAL_ROBOT_DESCRIPTION_TOPIC = "/terminal_state/robot_description"
+TARGET_ROBOT_DESCRIPTION_TOPIC = "/terminal_target/robot_description"
 JOINT_STATES_TOPIC = "/mpc/joint_states"
 TERMINAL_JOINT_STATES_TOPIC = "/terminal_state/joint_states"
 TARGET_JOINT_STATES_TOPIC = "/terminal_target/joint_states"
@@ -220,13 +222,21 @@ class MPCLaunchConfig:
             parameters=[
                 {
                     "robot_description": Command(
-                        ["xacro ", LaunchConfiguration("description_name")]
+                        [
+                            "python3 -m humanoid_common_mpc_ros2.urdf_prefix ",
+                            LaunchConfiguration("description_name"),
+                            " ",
+                            "terminal_state/",
+                        ]
                     ),
-                    "frame_prefix": "terminal_state/",
                     "publish_frequency": 180.0,
                 }
             ],
             remappings=[
+                (
+                    "/robot_description",
+                    TERMINAL_ROBOT_DESCRIPTION_TOPIC,
+                ),
                 (
                     "/joint_states",
                     TERMINAL_JOINT_STATES_TOPIC,
@@ -241,13 +251,21 @@ class MPCLaunchConfig:
             parameters=[
                 {
                     "robot_description": Command(
-                        ["xacro ", LaunchConfiguration("description_name")]
+                        [
+                            "python3 -m humanoid_common_mpc_ros2.urdf_prefix ",
+                            LaunchConfiguration("description_name"),
+                            " ",
+                            "terminal_target/",
+                        ]
                     ),
-                    "frame_prefix": "terminal_target/",
                     "publish_frequency": 180.0,
                 }
             ],
             remappings=[
+                (
+                    "/robot_description",
+                    TARGET_ROBOT_DESCRIPTION_TOPIC,
+                ),
                 (
                     "/joint_states",
                     TARGET_JOINT_STATES_TOPIC,

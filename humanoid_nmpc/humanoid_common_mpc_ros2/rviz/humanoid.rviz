@@ -14,7 +14,6 @@ Panels:
         - /Cartesian Markers1/Namespaces1
         - /OptimizedStateTrajectory1
         - /Hand Pose Markers1
-        - /Terminal Target RobotModel1
         - /CollisionMarkerArray1
       Splitter Ratio: 0.5
     Tree Height: 466
@@ -318,58 +317,6 @@ Visualization Manager:
       Show Descriptions: false
       Show Visual Aids: false
       Value: true
-    - Alpha: 0.4000000059604645
-      Class: rviz_default_plugins/RobotModel
-      Collision Enabled: false
-      Description File: ""
-      Description Source: Topic
-      Description Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /mpc/robot_description
-      Enabled: false
-      Links:
-        All Links Enabled: true
-        Expand Joint Details: false
-        Expand Link Details: false
-        Expand Tree: false
-        Link Tree Style: Links in Alphabetic Order
-      Mass Properties:
-        Inertia: false
-        Mass: false
-      Name: Terminal State RobotModel
-      TF Prefix: terminal_state
-      Update Interval: 0
-      Value: false
-      Visual Enabled: true
-    - Alpha: 0.30000001192092896
-      Class: rviz_default_plugins/RobotModel
-      Collision Enabled: false
-      Description File: ""
-      Description Source: Topic
-      Description Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /mpc/robot_description
-      Enabled: false
-      Links:
-        All Links Enabled: true
-        Expand Joint Details: false
-        Expand Link Details: false
-        Expand Tree: false
-        Link Tree Style: Links in Alphabetic Order
-      Mass Properties:
-        Inertia: false
-        Mass: false
-      Name: Terminal Target RobotModel
-      TF Prefix: terminal_target
-      Update Interval: 0
-      Value: false
-      Visual Enabled: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: false
       Name: CollisionMarkerArray
