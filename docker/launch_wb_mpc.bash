@@ -46,6 +46,7 @@ docker run --rm -it \
   -v "${XAUTH}:${XAUTH}:rw" \
   -v "${HOST_WS_CACHE}:${CONTAINER_WS}:cached" \
   -v "${HOST_REPO}:${CONTAINER_REPO}:cached" \
+  -v $(pwd)/setup_uri.sh:${CONTAINER_REPO}/setup_uri.sh \
   --workdir "${CONTAINER_REPO}" \
   wb-humanoid-mpc:dev \
   bash
