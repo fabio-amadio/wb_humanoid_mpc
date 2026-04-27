@@ -139,6 +139,7 @@ class HumanoidVisualizer : public DummyObserver {
     std::string referenceName;
     std::string linkName;
     std::string referenceFrameName;
+    std::string visualReferenceFrameName;
     geometry_msgs::msg::Pose poseInReferenceFrame = []() {
       geometry_msgs::msg::Pose pose;
       pose.orientation.w = 1.0;

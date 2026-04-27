@@ -69,7 +69,7 @@ COMVisualizer::COMVisualizer() : Node("COMVisualizer") {
 
   // Subscribe to joint states
   joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
-      "joint_states", 10, std::bind(&COMVisualizer::updateJointPositions, this, std::placeholders::_1));
+      "mpc/joint_states", 10, std::bind(&COMVisualizer::updateJointPositions, this, std::placeholders::_1));
 
   // Create publisher for COM marker
   com_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("humanoid/com_markers", 10);

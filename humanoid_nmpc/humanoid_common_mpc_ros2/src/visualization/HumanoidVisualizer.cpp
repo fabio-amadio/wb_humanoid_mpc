@@ -61,6 +61,8 @@ namespace ocs2::humanoid {
 
 namespace {
 
+constexpr const char* kMpcFramePrefix = "mpc/";
+
 geometry_msgs::msg::Pose toPoseMsg(const vector3_t& position, const quaternion_t& orientation) {
   geometry_msgs::msg::Pose pose;
   pose.position.x = position.x();
@@ -141,9 +143,11 @@ void HumanoidVisualizer::mpcObservationCallback(const ocs2_ros2_msgs::msg::MpcOb
 
 void HumanoidVisualizer::createVisualizationPublishers() {
   tfBroadcasterPtr_.reset(new tf2_ros::TransformBroadcaster(node_handle_));
-  jointPublisherPtr_ = node_handle_->create_publisher<sensor_msgs::msg::JointState>("joint_states", 1);
-  terminalJointPublisherPtr_ = node_handle_->create_publisher<sensor_msgs::msg::JointState>("terminal_state/joint_states", 1);
-  terminalJointTargetPublisherPtr_ = node_handle_->create_publisher<sensor_msgs::msg::JointState>("terminal_target/joint_states", 1);
+  jointPublisherPtr_ = node_handle_->create_publisher<sensor_msgs::msg::JointState>("mpc/joint_states", 1);
+  terminalJointPublisherPtr_ =
+      node_handle_->create_publisher<sensor_msgs::msg::JointState>("terminal_state/joint_states", 1);
+  terminalJointTargetPublisherPtr_ =
+      node_handle_->create_publisher<sensor_msgs::msg::JointState>("terminal_target/joint_states", 1);
   markerPublisherPtr_ = node_handle_->create_publisher<visualization_msgs::msg::MarkerArray>("cartesian_markers", 1);
   collsisionMarkerPublisherPtr_ = node_handle_->create_publisher<visualization_msgs::msg::MarkerArray>("collision_markers", 1);
   stateOptimizedPublisherPtr_ = node_handle_->create_publisher<visualization_msgs::msg::MarkerArray>("optimized_state_markers", 1);
@@ -186,6 +190,7 @@ void HumanoidVisualizer::initializeHandInteractiveMarkers(const std::string& tas
     handMarker.markerName = referenceName + "_interactive_marker";
     handMarker.linkName = linkName;
     handMarker.referenceFrameName = referenceFrameName;
+    handMarker.visualReferenceFrameName = std::string(kMpcFramePrefix) + referenceFrameName;
     handMarker.publisher = node_handle_->create_publisher<geometry_msgs::msg::PoseStamped>(
         "/" + mpcRobotModelPtr_->modelSettings.robotName + "/" + referenceName + "_pose_reference", 1);
 
@@ -229,7 +234,7 @@ void HumanoidVisualizer::updateHandInteractiveMarkers() {
     handMarker.poseInReferenceFrame = toPoseMsg(referenceToHand.translation(), referenceOrientationToHand.normalized());
 
     visualization_msgs::msg::InteractiveMarker marker;
-    marker.header.frame_id = handMarker.referenceFrameName;
+    marker.header.frame_id = handMarker.visualReferenceFrameName;
     marker.name = handMarker.markerName;
     marker.description = handMarker.referenceName + " pose";
     marker.scale = 0.14;
@@ -271,7 +276,7 @@ void HumanoidVisualizer::updateHandInteractiveMarkers() {
 
     geometry_msgs::msg::PoseStamped referenceMsg;
     referenceMsg.header.stamp = node_handle_->now();
-    referenceMsg.header.frame_id = handMarker.referenceFrameName;
+    referenceMsg.header.frame_id = handMarker.visualReferenceFrameName;
     referenceMsg.pose = handMarker.poseInReferenceFrame;
     handMarker.publisher->publish(referenceMsg);
   }
@@ -303,7 +308,8 @@ void HumanoidVisualizer::processHandInteractiveMarkerFeedback(
 
     geometry_msgs::msg::PoseStamped referenceMsg;
     referenceMsg.header.stamp = feedback->header.stamp;
-    referenceMsg.header.frame_id = feedback->header.frame_id.empty() ? handMarker.referenceFrameName : feedback->header.frame_id;
+    referenceMsg.header.frame_id =
+        feedback->header.frame_id.empty() ? handMarker.visualReferenceFrameName : feedback->header.frame_id;
     referenceMsg.pose = feedback->pose;
     handMarker.publisher->publish(referenceMsg);
     break;
@@ -316,7 +322,7 @@ void HumanoidVisualizer::processHandInteractiveMarkerFeedback(
 
 void HumanoidVisualizer::publishObservation(const SystemObservation& observation) const {
   vector_t state(observation.state);
-  publishBaseTransform(mpcRobotModelPtr_->getBasePose(state));
+  publishBaseTransform(mpcRobotModelPtr_->getBasePose(state), "mpc/");
   publishJointTransforms(mpcRobotModelPtr_->getJointAngles(state), jointPublisherPtr_);
 }
 

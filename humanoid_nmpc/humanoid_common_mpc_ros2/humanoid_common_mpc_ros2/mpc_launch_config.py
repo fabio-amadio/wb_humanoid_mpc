@@ -8,6 +8,12 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import Command, LaunchConfiguration
 
 
+ROBOT_DESCRIPTION_TOPIC = "/mpc/robot_description"
+JOINT_STATES_TOPIC = "/mpc/joint_states"
+TERMINAL_JOINT_STATES_TOPIC = "/terminal_state/joint_states"
+TARGET_JOINT_STATES_TOPIC = "/terminal_target/joint_states"
+
+
 def extract_constant_from_cpp(file_path, constant_name):
     with open(file_path, "r") as file:
         for line in file:
@@ -185,10 +191,25 @@ class MPCLaunchConfig:
             parameters=[
                 {
                     "robot_description": Command(
-                        ["xacro ", LaunchConfiguration("description_name")]
+                        [
+                            "python3 -m humanoid_common_mpc_ros2.urdf_prefix ",
+                            LaunchConfiguration("description_name"),
+                            " ",
+                            "mpc/",
+                        ]
                     ),
                     "publish_frequency": 180.0,
                 }
+            ],
+            remappings=[
+                (
+                    "/robot_description",
+                    ROBOT_DESCRIPTION_TOPIC,
+                ),
+                (
+                    "/joint_states",
+                    JOINT_STATES_TOPIC,
+                ),
             ],
         )
 
@@ -208,7 +229,7 @@ class MPCLaunchConfig:
             remappings=[
                 (
                     "/joint_states",
-                    "/terminal_state/joint_states",
+                    TERMINAL_JOINT_STATES_TOPIC,
                 )  # Remap the joint_states topic
             ],
         )
@@ -229,7 +250,7 @@ class MPCLaunchConfig:
             remappings=[
                 (
                     "/joint_states",
-                    "/terminal_target/joint_states",
+                    TARGET_JOINT_STATES_TOPIC,
                 )  # Remap the joint_states topic
             ],
         )
