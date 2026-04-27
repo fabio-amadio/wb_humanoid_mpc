@@ -27,10 +27,16 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ****************************************************************************"""
 
-import pygame
+import os
 import time
 import subprocess
 from dataclasses import dataclass
+
+# This interface only uses joystick input. Keep SDL away from the host audio
+# stack to avoid spurious ALSA underrun warnings in headless/containerized runs.
+os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+
+import pygame
 from humanoid_mpc_msgs.msg import WalkingVelocityCommand
 
 DEFAULT_BASE_HEIGHT = 0.7925
@@ -64,7 +70,7 @@ def clamp(value, min_value, max_value):
 
 class XBoxControllerInterface:
     def __init__(self, publisher_rate):
-        pygame.init()
+        pygame.joystick.init()
         self.joystick_connected = False
         self.get_joystick_connection()
 
