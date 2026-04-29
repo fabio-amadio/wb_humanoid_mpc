@@ -308,7 +308,7 @@ class App(tk.Tk):
         msg.desired_pelvis_height = min(
             max(self.slider.get(), self.min_base_height), self.max_base_height
         )
-        msg.desired_waist_yaw = math.radians(self.waist_yaw_slider.get())
+        msg.desired_waist_yaw = -math.radians(self.waist_yaw_slider.get())
         msg.desired_waist_roll = math.radians(self.waist_roll_slider.get())
         msg.desired_waist_pitch = math.radians(self.waist_pitch_slider.get())
         return msg
