@@ -61,10 +61,22 @@ Ros2ProceduralMpcMotionManager::Ros2ProceduralMpcMotionManager(
     waistReferenceTransitionDuration_ = std::max<scalar_t>(*waistReferenceTransitionDuration, 0.0);
   }
   if (const auto waistYawMin = pt.get_optional<scalar_t>("waistYawBounds.min")) {
-    waistYawBounds_.min = *waistYawMin;
+    waistOrientationBounds_.min.x() = *waistYawMin;
   }
   if (const auto waistYawMax = pt.get_optional<scalar_t>("waistYawBounds.max")) {
-    waistYawBounds_.max = *waistYawMax;
+    waistOrientationBounds_.max.x() = *waistYawMax;
+  }
+  if (const auto waistRollMin = pt.get_optional<scalar_t>("waistRollBounds.min")) {
+    waistOrientationBounds_.min.y() = *waistRollMin;
+  }
+  if (const auto waistRollMax = pt.get_optional<scalar_t>("waistRollBounds.max")) {
+    waistOrientationBounds_.max.y() = *waistRollMax;
+  }
+  if (const auto waistPitchMin = pt.get_optional<scalar_t>("waistPitchBounds.min")) {
+    waistOrientationBounds_.min.z() = *waistPitchMin;
+  }
+  if (const auto waistPitchMax = pt.get_optional<scalar_t>("waistPitchBounds.max")) {
+    waistOrientationBounds_.max.z() = *waistPitchMax;
   }
   for (const std::string& handName : {"left_hand", "right_hand"}) {
     HandPositionBounds bounds;
@@ -94,18 +106,18 @@ Ros2ProceduralMpcMotionManager::Ros2ProceduralMpcMotionManager(
 void Ros2ProceduralMpcMotionManager::setAndScaleVelocityCommand(const WalkingVelocityCommand& rawVelocityCommand) {
   std::lock_guard<std::mutex> lock(walkingVelCommandMutex_);
   velocityCommand_ = scaleWalkingVelocityCommand(rawVelocityCommand);
-  const scalar_t clampedWaistYaw = clampWaistYaw(rawVelocityCommand.desired_waist_yaw);
-  if (!waistYawReferenceInitialized_) {
-    waistYawReferenceInitialized_ = true;
-    waistYawTransitionStartTime_ = currentSolverTime_;
-    waistYawStartReference_ = clampedWaistYaw;
-    waistYawGoalReference_ = clampedWaistYaw;
+  const vector3_t clampedWaistOrientation = clampWaistOrientation(rawVelocityCommand.getWaistOrientation());
+  if (!waistOrientationReferenceInitialized_) {
+    waistOrientationReferenceInitialized_ = true;
+    waistOrientationTransitionStartTime_ = currentSolverTime_;
+    waistOrientationStartReference_ = clampedWaistOrientation;
+    waistOrientationGoalReference_ = clampedWaistOrientation;
   } else {
-    waistYawStartReference_ = interpolateWaistYaw(currentSolverTime_);
-    waistYawGoalReference_ = clampedWaistYaw;
-    waistYawTransitionStartTime_ = currentSolverTime_;
+    waistOrientationStartReference_ = interpolateWaistOrientation(currentSolverTime_);
+    waistOrientationGoalReference_ = clampedWaistOrientation;
+    waistOrientationTransitionStartTime_ = currentSolverTime_;
   }
-  velocityCommand_.desired_waist_yaw = clampedWaistYaw;
+  velocityCommand_.setWaistOrientation(clampedWaistOrientation);
 }
 
 void Ros2ProceduralMpcMotionManager::subscribe(rclcpp::Node::SharedPtr nodeHandle, const rclcpp::QoS& qos) {
@@ -157,40 +169,46 @@ vector3_t Ros2ProceduralMpcMotionManager::clampHandPosition(const std::string& r
   return clampedPosition;
 }
 
-scalar_t Ros2ProceduralMpcMotionManager::clampWaistYaw(scalar_t desiredWaistYaw) const {
+vector3_t Ros2ProceduralMpcMotionManager::clampWaistOrientation(const vector3_t& desiredWaistOrientation) const {
   constexpr scalar_t kRadToDeg = 180.0 / 3.14159265358979323846;
   constexpr scalar_t kClampTolerance = 1e-6;
-  const scalar_t clampedWaistYaw = std::clamp(desiredWaistYaw, waistYawBounds_.min, waistYawBounds_.max);
-  if (std::abs(clampedWaistYaw - desiredWaistYaw) > kClampTolerance) {
+  vector3_t clampedWaistOrientation = desiredWaistOrientation;
+  clampedWaistOrientation.x() = std::clamp(clampedWaistOrientation.x(), waistOrientationBounds_.min.x(), waistOrientationBounds_.max.x());
+  clampedWaistOrientation.y() = std::clamp(clampedWaistOrientation.y(), waistOrientationBounds_.min.y(), waistOrientationBounds_.max.y());
+  clampedWaistOrientation.z() = std::clamp(clampedWaistOrientation.z(), waistOrientationBounds_.min.z(), waistOrientationBounds_.max.z());
+  if ((clampedWaistOrientation - desiredWaistOrientation).cwiseAbs().maxCoeff() > kClampTolerance) {
     auto logger = rclcpp::get_logger("Ros2ProceduralMpcMotionManager");
     rclcpp::Clock steadyClock(RCL_STEADY_TIME);
     RCLCPP_WARN_THROTTLE(logger, steadyClock, 1000,
-                         "Clamped waist yaw reference from %.1f deg to %.1f deg.",
-                         desiredWaistYaw * kRadToDeg, clampedWaistYaw * kRadToDeg);
+                         "Clamped waist reference from [%.1f %.1f %.1f] deg to [%.1f %.1f %.1f] deg.",
+                         desiredWaistOrientation.x() * kRadToDeg, desiredWaistOrientation.y() * kRadToDeg,
+                         desiredWaistOrientation.z() * kRadToDeg, clampedWaistOrientation.x() * kRadToDeg,
+                         clampedWaistOrientation.y() * kRadToDeg, clampedWaistOrientation.z() * kRadToDeg);
   }
-  return clampedWaistYaw;
+  return clampedWaistOrientation;
 }
 
-scalar_t Ros2ProceduralMpcMotionManager::interpolateWaistYaw(scalar_t time) const {
-  if (!waistYawReferenceInitialized_ || waistReferenceTransitionDuration_ <= 1e-9) {
-    return waistYawGoalReference_;
+vector3_t Ros2ProceduralMpcMotionManager::interpolateWaistOrientation(scalar_t time) const {
+  if (!waistOrientationReferenceInitialized_ || waistReferenceTransitionDuration_ <= 1e-9) {
+    return waistOrientationGoalReference_;
   }
 
-  const scalar_t alpha = std::clamp((time - waistYawTransitionStartTime_) / waistReferenceTransitionDuration_, scalar_t(0.0), scalar_t(1.0));
-  return (1.0 - alpha) * waistYawStartReference_ + alpha * waistYawGoalReference_;
+  const scalar_t alpha =
+      std::clamp((time - waistOrientationTransitionStartTime_) / waistReferenceTransitionDuration_, scalar_t(0.0), scalar_t(1.0));
+  return (1.0 - alpha) * waistOrientationStartReference_ + alpha * waistOrientationGoalReference_;
 }
 
 WalkingVelocityCommand Ros2ProceduralMpcMotionManager::getScaledWalkingVelocityCommand(scalar_t time) {
   std::lock_guard<std::mutex> lock(walkingVelCommandMutex_);
   currentSolverTime_ = time;
-  if (!waistYawReferenceInitialized_) {
-    waistYawReferenceInitialized_ = true;
-    waistYawTransitionStartTime_ = time;
-    waistYawStartReference_ = velocityCommand_.desired_waist_yaw;
-    waistYawGoalReference_ = velocityCommand_.desired_waist_yaw;
+  if (!waistOrientationReferenceInitialized_) {
+    waistOrientationReferenceInitialized_ = true;
+    waistOrientationTransitionStartTime_ = time;
+    waistOrientationStartReference_ = velocityCommand_.getWaistOrientation();
+    waistOrientationGoalReference_ = velocityCommand_.getWaistOrientation();
   }
   WalkingVelocityCommand command = velocityCommand_;
-  command.desired_waist_yaw = interpolateWaistYaw(time);
+  command.setWaistOrientation(interpolateWaistOrientation(time));
   return command;
 }
 

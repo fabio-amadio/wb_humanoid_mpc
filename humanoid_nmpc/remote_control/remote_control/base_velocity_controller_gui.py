@@ -40,6 +40,8 @@ from remote_control.tk_app import JoystickGui, LEDIndicatorGui
 
 DEFAULT_BASE_HEIGHT = 0.7925
 WAIST_YAW_LIMIT_DEG = 90.0
+WAIST_PITCH_LIMIT_DEG = 28.0
+WAIST_ROLL_LIMIT_DEG = 20.0
 
 
 class App(tk.Tk):
@@ -164,20 +166,52 @@ class App(tk.Tk):
         self.waist_slider_frame.grid(
             row=1, column=0, columnspan=3, padx=15, pady=(0, 10), sticky="ew"
         )
+        self.waist_slider_frame.columnconfigure(1, weight=1)
 
-        self.waist_slider_label = ttk.Label(self.waist_slider_frame, text="Waist Yaw")
-        self.waist_slider_label.pack(pady=(0, 5))
+        self.waist_yaw_label = ttk.Label(self.waist_slider_frame, text="Waist Yaw")
+        self.waist_yaw_label.grid(row=0, column=0, padx=(0, 12), pady=(0, 5), sticky="w")
 
-        self.waist_slider = ttk.Scale(
+        self.waist_yaw_slider = ttk.Scale(
             self.waist_slider_frame,
             from_=-WAIST_YAW_LIMIT_DEG,
             to=WAIST_YAW_LIMIT_DEG,
             orient="horizontal",
-            command=self.waist_slider_callback,
+            length=360,
+            command=self.waist_yaw_slider_callback,
         )
-        self.waist_slider.set(0.0)
-        self.waist_slider.pack(fill="x", padx=30)
-        self.waist_slider.bind("<ButtonRelease-1>", self.on_waist_slider_release)
+        self.waist_yaw_slider.set(0.0)
+        self.waist_yaw_slider.grid(row=0, column=1, padx=(12, 24), pady=(0, 5), sticky="ew")
+        self.waist_yaw_slider.bind("<ButtonRelease-1>", self.on_waist_slider_release)
+
+        self.waist_roll_label = ttk.Label(self.waist_slider_frame, text="Waist Roll")
+        self.waist_roll_label.grid(row=1, column=0, padx=(0, 12), pady=(0, 5), sticky="w")
+
+        self.waist_roll_slider = ttk.Scale(
+            self.waist_slider_frame,
+            from_=-WAIST_ROLL_LIMIT_DEG,
+            to=WAIST_ROLL_LIMIT_DEG,
+            orient="horizontal",
+            length=360,
+            command=self.waist_roll_slider_callback,
+        )
+        self.waist_roll_slider.set(0.0)
+        self.waist_roll_slider.grid(row=1, column=1, padx=(12, 24), pady=(0, 5), sticky="ew")
+        self.waist_roll_slider.bind("<ButtonRelease-1>", self.on_waist_slider_release)
+
+        self.waist_pitch_label = ttk.Label(self.waist_slider_frame, text="Waist Pitch")
+        self.waist_pitch_label.grid(row=2, column=0, padx=(0, 12), sticky="w")
+
+        self.waist_pitch_slider = ttk.Scale(
+            self.waist_slider_frame,
+            from_=-WAIST_PITCH_LIMIT_DEG,
+            to=WAIST_PITCH_LIMIT_DEG,
+            orient="horizontal",
+            length=360,
+            command=self.waist_pitch_slider_callback,
+        )
+        self.waist_pitch_slider.set(0.0)
+        self.waist_pitch_slider.grid(row=2, column=1, padx=(12, 24), sticky="ew")
+        self.waist_pitch_slider.bind("<ButtonRelease-1>", self.on_waist_slider_release)
 
         # Control frame
         control_frame = ttk.Frame(main_frame)
@@ -211,7 +245,13 @@ class App(tk.Tk):
     def slider_callback(self, value):
         pass
 
-    def waist_slider_callback(self, value):
+    def waist_yaw_slider_callback(self, value):
+        pass
+
+    def waist_roll_slider_callback(self, value):
+        pass
+
+    def waist_pitch_slider_callback(self, value):
         pass
 
     def set_joystick_connected(self, is_connected):
@@ -236,19 +276,25 @@ class App(tk.Tk):
 
     def on_waist_slider_release(self, event):
         if self.auto_center_var.get():
-            self.waist_slider.set(0.0)
+            self.waist_yaw_slider.set(0.0)
+            self.waist_roll_slider.set(0.0)
+            self.waist_pitch_slider.set(0.0)
 
     def center_all(self):
         self.joystick_left.set_position()
         self.joystick_right.set_position()
         self.slider.set(self.slider_default_value)
-        self.waist_slider.set(0.0)
+        self.waist_yaw_slider.set(0.0)
+        self.waist_roll_slider.set(0.0)
+        self.waist_pitch_slider.set(0.0)
 
     def set_knob_positions(self, msg: WalkingVelocityCommand):
         self.joystick_left.set_position(msg.linear_velocity_x, msg.linear_velocity_y)
         self.joystick_right.set_position(0.0, msg.angular_velocity_z)
         self.slider.set((msg.desired_pelvis_height - 0.2) / 0.008)
-        self.waist_slider.set(math.degrees(msg.desired_waist_yaw))
+        self.waist_yaw_slider.set(math.degrees(msg.desired_waist_yaw))
+        self.waist_roll_slider.set(math.degrees(msg.desired_waist_roll))
+        self.waist_pitch_slider.set(math.degrees(msg.desired_waist_pitch))
 
     def get_walking_command_msg(self):
         msg = WalkingVelocityCommand()
@@ -258,7 +304,9 @@ class App(tk.Tk):
         msg.angular_velocity_z = self.joystick_right.y_norm
 
         msg.desired_pelvis_height = min(self.slider.get() * 0.008 + 0.2, DEFAULT_BASE_HEIGHT)
-        msg.desired_waist_yaw = math.radians(self.waist_slider.get())
+        msg.desired_waist_yaw = math.radians(self.waist_yaw_slider.get())
+        msg.desired_waist_roll = math.radians(self.waist_roll_slider.get())
+        msg.desired_waist_pitch = math.radians(self.waist_pitch_slider.get())
         return msg
 
 

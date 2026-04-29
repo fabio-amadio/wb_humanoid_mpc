@@ -77,6 +77,8 @@ class CentroidalMpcTargetTrajectoriesCalculator : public TargetTrajectoriesCalcu
   const CentroidalModelInfo& info_;
   const scalar_t mass_;
   const size_t waistYawJointIndex_;
+  const size_t waistRollJointIndex_;
+  const size_t waistPitchJointIndex_;
 };
 
 }  // namespace ocs2::humanoid

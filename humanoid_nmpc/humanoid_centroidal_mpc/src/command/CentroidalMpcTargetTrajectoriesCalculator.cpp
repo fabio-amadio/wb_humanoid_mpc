@@ -50,7 +50,9 @@ CentroidalMpcTargetTrajectoriesCalculator::CentroidalMpcTargetTrajectoriesCalcul
       pinocchioInterface_(pinocchioInterface),
       info_(info),
       mass_(pinocchio::computeTotalMass(pinocchioInterface.getModel())),
-      waistYawJointIndex_(mpcRobotModel.getJointIndex("waist_yaw_joint")) {}
+      waistYawJointIndex_(mpcRobotModel.getJointIndex("waist_yaw_joint")),
+      waistRollJointIndex_(mpcRobotModel.getJointIndex("waist_roll_joint")),
+      waistPitchJointIndex_(mpcRobotModel.getJointIndex("waist_pitch_joint")) {}
 
 /******************************************************************************************************/
 /******************************************************************************************************/
@@ -93,6 +95,8 @@ TargetTrajectories CentroidalMpcTargetTrajectoriesCalculator::commandedVelocityT
   vector_t currentPoseTarget = getCurrentBasePoseTarget(initState);
   vector_t targetJointState = targetJointState_;
   targetJointState(waistYawJointIndex_) = commandedVelocities.desired_waist_yaw;
+  targetJointState(waistRollJointIndex_) = commandedVelocities.desired_waist_roll;
+  targetJointState(waistPitchJointIndex_) = commandedVelocities.desired_waist_pitch;
 
   vector4_t commVelTargetGlobal = filterAndTransformVelCommandToLocal(commandedVelocities.toVector(), currentPoseTarget(3), 0.8);
 

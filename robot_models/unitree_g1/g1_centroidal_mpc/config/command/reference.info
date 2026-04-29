@@ -7,7 +7,7 @@ maxDeltaPelvisHeight                0.4;
 maxRotationVelocity                 1.0;
 velocityTransitionDuration          1.0;
 handReferenceTransitionDuration     1.0;
-waistReferenceTransitionDuration    0.5;
+waistReferenceTransitionDuration    0.8;
 
 handPositionBounds
 {
@@ -35,6 +35,18 @@ waistYawBounds
 {
   min  -1.57079632679
   max   1.57079632679
+}
+
+waistRollBounds
+{
+  min  -0.3490658504
+  max   0.3490658504
+}
+
+waistPitchBounds
+{
+  min  -0.4886921906
+  max   0.4886921906
 }
 
 defaultBaseHeight                           0.7925

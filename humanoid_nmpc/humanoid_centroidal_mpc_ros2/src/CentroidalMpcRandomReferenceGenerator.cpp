@@ -973,6 +973,8 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
   std::string lastGaitCommand = currentGaitCommand;
   scalar_t lastGaitChangeTime = 0.0;
   const size_t waistYawJointIndex = mpcRobotModel.getJointIndex("waist_yaw_joint");
+  const size_t waistRollJointIndex = mpcRobotModel.getJointIndex("waist_roll_joint");
+  const size_t waistPitchJointIndex = mpcRobotModel.getJointIndex("waist_pitch_joint");
 
   CentroidalMpcTargetTrajectoriesCalculator targetCalculator(options.referenceFile, mpcRobotModel, interface.getPinocchioInterface(),
                                                              interface.getCentroidalModelInfo(), interface.mpcSettings().timeHorizon_);
@@ -1059,6 +1061,8 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
     applyBaseCommandDeadband(filteredVelCommand, options.baseCommandDeadband);
     filteredCommand.setFromVector(filteredVelCommand);
     filteredCommand.desired_waist_yaw = sampledMpcJointState[waistYawJointIndex];
+    filteredCommand.desired_waist_roll = sampledMpcJointState[waistRollJointIndex];
+    filteredCommand.desired_waist_pitch = sampledMpcJointState[waistPitchJointIndex];
     const vector6_t baseVelocity = mpcRobotModel.getBaseComVelocity(observation.state);
     auto currentCfg = gaitModeStates[currentGaitMode];
 

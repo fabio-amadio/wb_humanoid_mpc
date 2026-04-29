@@ -134,6 +134,8 @@ class KeyboardWalkingCommandPublisher(Node):
         )
         msg.desired_pelvis_height = self.current_pelvis_height_target
         msg.desired_waist_yaw = 0.0
+        msg.desired_waist_roll = 0.0
+        msg.desired_waist_pitch = 0.0
         return msg
 
     def timer_callback(self):

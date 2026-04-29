@@ -41,12 +41,20 @@ namespace ocs2::humanoid {
 struct WalkingVelocityCommand {
  public:
   WalkingVelocityCommand() = default;
-  WalkingVelocityCommand(scalar_t v_x, scalar_t v_y, scalar_t desired_pelvis_h, scalar_t v_yaw, scalar_t desired_waist_yaw = 0.0)
+  WalkingVelocityCommand(scalar_t v_x,
+                         scalar_t v_y,
+                         scalar_t desired_pelvis_h,
+                         scalar_t v_yaw,
+                         scalar_t desired_waist_yaw = 0.0,
+                         scalar_t desired_waist_roll = 0.0,
+                         scalar_t desired_waist_pitch = 0.0)
       : linear_velocity_x(v_x),
         linear_velocity_y(v_y),
         desired_pelvis_height(desired_pelvis_h),
         angular_velocity_z(v_yaw),
-        desired_waist_yaw(desired_waist_yaw){};
+        desired_waist_yaw(desired_waist_yaw),
+        desired_waist_roll(desired_waist_roll),
+        desired_waist_pitch(desired_waist_pitch){};
   WalkingVelocityCommand(const vector4_t& velCommand)
       : linear_velocity_x(velCommand(0)),
         linear_velocity_y(velCommand(1)),
@@ -57,6 +65,8 @@ struct WalkingVelocityCommand {
   scalar_t desired_pelvis_height = 0.8;  // Above ground
   scalar_t angular_velocity_z = 0.0;
   scalar_t desired_waist_yaw = 0.0;
+  scalar_t desired_waist_roll = 0.0;
+  scalar_t desired_waist_pitch = 0.0;
 
   void setToDefaultCommand() {
     linear_velocity_x = 0.0;
@@ -64,6 +74,8 @@ struct WalkingVelocityCommand {
     desired_pelvis_height = 0.8;  // Above ground
     angular_velocity_z = 0.0;
     desired_waist_yaw = 0.0;
+    desired_waist_roll = 0.0;
+    desired_waist_pitch = 0.0;
   }
 
   vector4_t toVector() const { return vector4_t(linear_velocity_x, linear_velocity_y, desired_pelvis_height, angular_velocity_z); };
@@ -72,6 +84,14 @@ struct WalkingVelocityCommand {
     linear_velocity_y = velCommand(1);
     desired_pelvis_height = velCommand(2);
     angular_velocity_z = velCommand(3);
+  }
+
+  vector3_t getWaistOrientation() const { return vector3_t(desired_waist_yaw, desired_waist_roll, desired_waist_pitch); }
+
+  void setWaistOrientation(const vector3_t& waistOrientation) {
+    desired_waist_yaw = waistOrientation.x();
+    desired_waist_roll = waistOrientation.y();
+    desired_waist_pitch = waistOrientation.z();
   }
 };
 
@@ -83,6 +103,8 @@ inline WalkingVelocityCommand getWalkingVelocityCommandFromMsg(const humanoid_mp
   cmd.desired_pelvis_height = std::clamp(msg.desired_pelvis_height, 0.2, 1.0);
   cmd.angular_velocity_z = std::clamp(msg.angular_velocity_z, -1.0, 1.0);
   cmd.desired_waist_yaw = std::clamp(msg.desired_waist_yaw, -kPi, kPi);
+  cmd.desired_waist_roll = std::clamp(msg.desired_waist_roll, -kPi, kPi);
+  cmd.desired_waist_pitch = std::clamp(msg.desired_waist_pitch, -kPi, kPi);
   return cmd;
 }
 }  // namespace ocs2::humanoid

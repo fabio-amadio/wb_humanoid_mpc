@@ -69,6 +69,8 @@ void VelocityCommandKeyboardPublisher::publishKeyboardCommand(const std::string&
     msg.desired_pelvis_height = defaultBaseHeight_ + commandLineInput[2];
     msg.angular_velocity_z = commandLineInput[3] / targetCommandLimits_[3];
     msg.desired_waist_yaw = 0.0;
+    msg.desired_waist_roll = 0.0;
+    msg.desired_waist_pitch = 0.0;
 
     // publish TargetTrajectories
     commandPublisherPtr_->publish(msg);

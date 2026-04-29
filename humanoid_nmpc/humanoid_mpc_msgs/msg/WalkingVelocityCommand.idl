@@ -28,6 +28,16 @@ module humanoid_mpc_msgs {
        * Desired waist yaw joint angle in [rad]
        */
       double desired_waist_yaw;
+
+      /**
+       * Desired waist roll joint angle in [rad]
+       */
+      double desired_waist_roll;
+
+      /**
+       * Desired waist pitch joint angle in [rad]
+       */
+      double desired_waist_pitch;
     };
   };
 };
