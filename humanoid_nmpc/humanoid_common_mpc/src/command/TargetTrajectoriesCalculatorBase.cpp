@@ -31,6 +31,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "humanoid_common_mpc/command/TargetTrajectoriesCalculatorBase.h"
 
 #include <algorithm>  // For std::clamp
+#include <boost/property_tree/info_parser.hpp>
+#include <boost/property_tree/ptree.hpp>
 
 #include <ocs2_core/misc/LoadData.h>
 
@@ -53,6 +55,12 @@ TargetTrajectoriesCalculatorBase::TargetTrajectoriesCalculatorBase(const std::st
   loadData::loadCppDataType(referenceFile, "maxDisplacementVelocityY", maxDisplacementVelocityY_);
   loadData::loadCppDataType(referenceFile, "maxDeltaPelvisHeight", maxDeltaPelvisHeight_);
   loadData::loadCppDataType(referenceFile, "maxRotationVelocity", maxRotationVelocity_);
+
+  boost::property_tree::ptree pt;
+  boost::property_tree::read_info(referenceFile, pt);
+  if (const auto velocityTransitionDuration = pt.get_optional<scalar_t>("velocityTransitionDuration")) {
+    velocityTransitionDuration_ = std::max<scalar_t>(*velocityTransitionDuration, 0.0);
+  }
 }
 
 /******************************************************************************************************/

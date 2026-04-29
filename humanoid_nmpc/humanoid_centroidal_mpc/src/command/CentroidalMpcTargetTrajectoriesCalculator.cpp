@@ -31,6 +31,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "humanoid_centroidal_mpc/command/CentroidalMpcTargetTrajectoriesCalculator.h"
 
 #include <boost/proto/proto_fwd.hpp>
+#include <algorithm>
 #include <cmath>
 
 #include <pinocchio/algorithm/center-of-mass.hpp>
@@ -86,74 +87,70 @@ TargetTrajectories CentroidalMpcTargetTrajectoriesCalculator::commandedPositionT
 TargetTrajectories CentroidalMpcTargetTrajectoriesCalculator::commandedVelocityToTargetTrajectories(const vector4_t& commandedVelocities,
                                                                                                     scalar_t initTime,
                                                                                                     const vector_t& initState) {
-  // This function constructs a target trajectory that interpolates between the current momentum and desired momentum for the first part
-  // of the horizon while applying the desired momentum fully to the latter half. All position targets are obtained integrating said
-  // velocity profile.
+  // Smoothly transition from the current base motion reference to the commanded one over the first part of the horizon.
 
   vector_t currentPoseTarget = getCurrentBasePoseTarget(initState);
 
   vector4_t commVelTargetGlobal = filterAndTransformVelCommandToLocal(commandedVelocities, currentPoseTarget(3), 0.8);
 
-  /////////////////////////
-  // Intermediate Target //
-  /////////////////////////
-
-  vector6_t targetBaseTwist;
-  targetBaseTwist << commVelTargetGlobal[0], commVelTargetGlobal[1], 0.0, 0.0, 0.0, commVelTargetGlobal[3];
-
   updateCentroidalDynamics(pinocchioInterface_, info_, mpcRobotModelPtr_->getGeneralizedCoordinates(initState));
   const Eigen::Matrix<scalar_t, 6, Eigen::Dynamic>& A = getCentroidalMomentumMatrix(pinocchioInterface_);
 
-  vector6_t targetMomentum;
-
   const Eigen::Matrix<scalar_t, 6, 6> Ab = A.leftCols<6>();
   const Eigen::Matrix<scalar_t, 6, 6> Ab_inv = computeFloatingBaseCentroidalMomentumMatrixInverse(Ab);
-
-  // This did not lead to meaningful commands around the z axis. Needs more investigations.
-  // targetMomentum = (Ab * targetBaseTwist);
-  // targetMomentum[2] = 0.0;
-  // targetMomentum[3] = 0.0;
-  // targetMomentum[4] = 0.0;
-
-  targetMomentum << commVelTargetGlobal[0], commVelTargetGlobal[1], 0.0, 0.0, 0.0, commVelTargetGlobal[3] / mass_;
-
-  // Comput base velocity from centroidal momentum, this assumes no joint velocities.
   vector6_t baseVel = Ab_inv * initState.head(6);
-  vector3_t averageVel;
-  averageVel(0) = (baseVel[0] + commVelTargetGlobal[0]) / 2;
-  averageVel(1) = (baseVel[1] + commVelTargetGlobal[1]) / 2;
-  averageVel(2) = (baseVel[5] + commVelTargetGlobal[3]) / 2;
+  vector4_t currentVelTarget;
+  currentVelTarget << baseVel[0], baseVel[1], currentPoseTarget[2], baseVel[5];
+  const scalar_t transitionDuration = std::min(std::max<scalar_t>(velocityTransitionDuration_, 0.0), mpcHorizon_);
 
-  currentPoseTarget[2] = commVelTargetGlobal[2];
-  scalar_t intermediateTargetTime = 0.7 * mpcHorizon_;
-  vector6_t intermediateTargetPose = integrateTargetBasePose(currentPoseTarget, averageVel, commVelTargetGlobal(2), intermediateTargetTime);
+  std::vector<scalar_t> knotTimes{0.0};
+  const scalar_t halfTransition = 0.5 * transitionDuration;
+  if (halfTransition > 1e-9 && halfTransition < mpcHorizon_ - 1e-9) {
+    knotTimes.push_back(halfTransition);
+  }
+  if (transitionDuration > 1e-9 && transitionDuration < mpcHorizon_ - 1e-9) {
+    knotTimes.push_back(transitionDuration);
+  }
+  if (mpcHorizon_ > knotTimes.back()) {
+    knotTimes.push_back(mpcHorizon_);
+  }
 
-  //////////////////
-  // Final Target //
-  //////////////////
+  scalar_array_t timeTrajectory;
+  vector_array_t stateTrajectory;
+  vector_array_t inputTrajectory;
+  timeTrajectory.reserve(knotTimes.size());
+  stateTrajectory.reserve(knotTimes.size());
+  inputTrajectory.reserve(knotTimes.size());
 
-  averageVel(0) = (commVelTargetGlobal[0]);
-  averageVel(1) = (commVelTargetGlobal[1]);
-  averageVel(2) = (commVelTargetGlobal[3]);
+  vector6_t poseAtKnot = currentPoseTarget;
+  vector4_t previousVelocityRef = currentVelTarget;
+  scalar_t previousRelativeTime = 0.0;
 
-  vector6_t finalTargetPose =
-      integrateTargetBasePose(intermediateTargetPose, averageVel, commVelTargetGlobal(2), (mpcHorizon_ - intermediateTargetTime));
+  for (const scalar_t relativeTime : knotTimes) {
+    const scalar_t alpha = transitionDuration > 1e-9 ? std::clamp(relativeTime / transitionDuration, scalar_t(0.0), scalar_t(1.0)) : 1.0;
+    const vector4_t velocityRef = (1.0 - alpha) * currentVelTarget + alpha * commVelTargetGlobal;
 
-  // desired time trajectory
-  const scalar_array_t timeTrajectory{initTime, initTime + intermediateTargetTime, initTime + mpcHorizon_};
+    if (relativeTime > previousRelativeTime) {
+      const vector3_t averageVel((previousVelocityRef[0] + velocityRef[0]) * 0.5, (previousVelocityRef[1] + velocityRef[1]) * 0.5,
+                                 (previousVelocityRef[3] + velocityRef[3]) * 0.5);
+      poseAtKnot = integrateTargetBasePose(poseAtKnot, averageVel, velocityRef[2], relativeTime - previousRelativeTime);
+    } else {
+      poseAtKnot[2] = velocityRef[2];
+    }
 
-  // desired state trajectory
-  vector_array_t stateTrajectory(3, vector_t::Zero(mpcRobotModelPtr_->getStateDim()));
-  stateTrajectory[0] << targetMomentum, currentPoseTarget, targetJointState_;
-  stateTrajectory[1] << targetMomentum, intermediateTargetPose, targetJointState_;
-  stateTrajectory[2] << targetMomentum, finalTargetPose, targetJointState_;
+    vector6_t momentumRef;
+    momentumRef << velocityRef[0], velocityRef[1], 0.0, 0.0, 0.0, velocityRef[3] / mass_;
 
-  // desired input trajectory (just right dimensions, they are not used)
-  const vector_array_t inputTrajectory(3, vector_t::Zero(mpcRobotModelPtr_->getInputDim()));
+    timeTrajectory.push_back(initTime + relativeTime);
+    stateTrajectory.emplace_back(vector_t::Zero(mpcRobotModelPtr_->getStateDim()));
+    stateTrajectory.back() << momentumRef, poseAtKnot, targetJointState_;
+    inputTrajectory.emplace_back(vector_t::Zero(mpcRobotModelPtr_->getInputDim()));
 
-  TargetTrajectories targetTrajectories{timeTrajectory, stateTrajectory, inputTrajectory};
+    previousVelocityRef = velocityRef;
+    previousRelativeTime = relativeTime;
+  }
 
-  return targetTrajectories;
+  return TargetTrajectories{timeTrajectory, stateTrajectory, inputTrajectory};
 }
 
 }  // namespace ocs2::humanoid

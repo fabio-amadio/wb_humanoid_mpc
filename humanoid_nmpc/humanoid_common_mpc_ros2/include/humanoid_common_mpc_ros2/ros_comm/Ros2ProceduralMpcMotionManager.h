@@ -73,6 +73,7 @@ class Ros2ProceduralMpcMotionManager : public ProceduralMpcMotionManager {
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr leftHandPoseSubscriber_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr rightHandPoseSubscriber_;
   std::mutex walkingVelCommandMutex_;
+  scalar_t handReferenceTransitionDuration_ = 0.3;
   std::string robotName_;
 };
 

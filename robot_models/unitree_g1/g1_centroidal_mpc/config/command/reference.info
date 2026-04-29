@@ -5,6 +5,8 @@ maxDisplacementVelocityX            1.5;
 maxDisplacementVelocityY            0.8;
 maxDeltaPelvisHeight                0.4;
 maxRotationVelocity                 1.0;
+velocityTransitionDuration          1.0;
+handReferenceTransitionDuration     1.0;
 
 defaultBaseHeight                           0.7925
 

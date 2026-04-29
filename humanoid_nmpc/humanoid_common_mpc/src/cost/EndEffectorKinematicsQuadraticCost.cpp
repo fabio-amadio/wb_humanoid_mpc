@@ -106,7 +106,7 @@ vector_t EndEffectorKinematicsQuadraticCost::getParameters(scalar_t time,
   const vector_t xRef = targetTrajectories.getDesiredState(time);
   const vector_t uRef = targetTrajectories.getDesiredInput(time);
 
-  const auto handPoseReference = handPoseReferenceManagerPtr_ != nullptr ? handPoseReferenceManagerPtr_->getReference(handPoseReferenceName_)
+  const auto handPoseReference = handPoseReferenceManagerPtr_ != nullptr ? handPoseReferenceManagerPtr_->getReference(handPoseReferenceName_, time)
                                                                          : std::nullopt;
   vector_t parameters(n_parameters_);
   parameters << (handPoseReference.has_value() ? getExternalReferenceCostElement(xRef, uRef, *handPoseReference)

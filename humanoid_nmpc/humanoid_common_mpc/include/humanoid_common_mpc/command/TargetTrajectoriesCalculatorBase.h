@@ -99,6 +99,7 @@ class TargetTrajectoriesCalculatorBase {
   scalar_t maxDisplacementVelocityY_ = 0.3;
   scalar_t maxDeltaPelvisHeight_ = 0.3;
   scalar_t maxRotationVelocity_ = 0.6;
+  scalar_t velocityTransitionDuration_ = 0.3;
 
   scalar_t defaultBaseHeight_;
   vector_t targetJointState_;

@@ -30,6 +30,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rclcpp/rclcpp.hpp>
 
+#include <boost/property_tree/info_parser.hpp>
+#include <boost/property_tree/ptree.hpp>
+
 #include <functional>
 #include <mutex>
 #include <utility>
@@ -47,7 +50,13 @@ Ros2ProceduralMpcMotionManager::Ros2ProceduralMpcMotionManager(
     std::string robotName)
     : ProceduralMpcMotionManager(
           gaitFile, referenceFile, switchedModelReferenceManagerPtr, mpcRobotModel, velocityTargetToTargetTrajectories),
-      robotName_(std::move(robotName)) {}
+      robotName_(std::move(robotName)) {
+  boost::property_tree::ptree pt;
+  boost::property_tree::read_info(referenceFile, pt);
+  if (const auto handReferenceTransitionDuration = pt.get_optional<scalar_t>("handReferenceTransitionDuration")) {
+    handReferenceTransitionDuration_ = std::max<scalar_t>(*handReferenceTransitionDuration, 0.0);
+  }
+}
 
 void Ros2ProceduralMpcMotionManager::setAndScaleVelocityCommand(const WalkingVelocityCommand& rawVelocityCommand) {
   std::lock_guard<std::mutex> lock(walkingVelCommandMutex_);
@@ -77,7 +86,7 @@ void Ros2ProceduralMpcMotionManager::setHandPoseReference(const std::string& ref
   reference.positionInReferenceFrame << msg.pose.position.x, msg.pose.position.y, msg.pose.position.z;
   reference.orientationReferenceToHand =
       quaternion_t(msg.pose.orientation.w, msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z).normalized();
-  switchedModelReferenceManagerPtr_->getHandPoseReferenceManagerPtr()->setReference(referenceName, reference);
+  switchedModelReferenceManagerPtr_->getHandPoseReferenceManagerPtr()->setReference(referenceName, reference, handReferenceTransitionDuration_);
 }
 
 WalkingVelocityCommand Ros2ProceduralMpcMotionManager::getScaledWalkingVelocityCommand() {
