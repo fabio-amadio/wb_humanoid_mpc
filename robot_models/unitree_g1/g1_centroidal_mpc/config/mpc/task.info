@@ -80,8 +80,8 @@ swing_trajectory_config
 ; multiple_shooting settings
 multiple_shooting
 {
-  nThreads                              4
-  dt                                    0.02
+  nThreads                              16
+  dt                                    0.04
   sqpIteration                          1
   deltaTol                              1e-4
   g_max                                 1e-2
@@ -110,13 +110,13 @@ rollout
 
 mpc
 {
-  timeHorizon                     1.2  ; [s]
+  timeHorizon                     1.0  ; [s]
   solutionTimeWindow              -1   ; maximum [s]
   coldStart                       false
 
   debugPrint                      false
 
-  mpcDesiredFrequency             80  ; [Hz]
+  mpcDesiredFrequency             50  ; [Hz]
   mrtDesiredFrequency             100 ; [Hz]
 }
 

@@ -109,7 +109,7 @@ mpc
   coldStart                       false
 
   debugPrint                      false
-s
+
   mpcDesiredFrequency             50  ; [Hz]
   mrtDesiredFrequency             100 ; [Hz]
 }
