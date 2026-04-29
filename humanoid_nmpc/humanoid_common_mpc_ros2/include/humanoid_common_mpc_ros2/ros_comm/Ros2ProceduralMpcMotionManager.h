@@ -32,7 +32,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rclcpp/rclcpp.hpp>
 
+#include <limits>
 #include <mutex>
+#include <unordered_map>
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "humanoid_common_mpc/reference_manager/ProceduralMpcMotionManager.h"
@@ -65,15 +67,23 @@ class Ros2ProceduralMpcMotionManager : public ProceduralMpcMotionManager {
   void subscribe(rclcpp::Node::SharedPtr nodeHandle, const rclcpp::QoS& qos);
 
  private:
+  struct HandPositionBounds {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    vector3_t min = vector3_t::Constant(-std::numeric_limits<scalar_t>::infinity());
+    vector3_t max = vector3_t::Constant(std::numeric_limits<scalar_t>::infinity());
+  };
+
   WalkingVelocityCommand getScaledWalkingVelocityCommand() override;
 
   void setHandPoseReference(const std::string& referenceName, const geometry_msgs::msg::PoseStamped& msg);
+  vector3_t clampHandPosition(const std::string& referenceName, const vector3_t& positionInReferenceFrame) const;
 
   rclcpp::Subscription<humanoid_mpc_msgs::msg::WalkingVelocityCommand>::SharedPtr velCommandSubscriber_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr leftHandPoseSubscriber_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr rightHandPoseSubscriber_;
   std::mutex walkingVelCommandMutex_;
   scalar_t handReferenceTransitionDuration_ = 0.3;
+  std::unordered_map<std::string, HandPositionBounds> handPositionBounds_;
   std::string robotName_;
 };
 

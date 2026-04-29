@@ -36,8 +36,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
+#include <limits>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 #include <visualization_msgs/msg/marker.hpp>
@@ -79,6 +81,7 @@ class HumanoidVisualizer : public DummyObserver {
    * @param maxUpdateFrequency : maximum publish frequency measured in MPC time.
    */
   HumanoidVisualizer(const std::string& taskFile,
+                     const std::string& referenceFile,
                      PinocchioInterface pinocchioInterface,
                      const MpcRobotModelBase<scalar_t>& mpcRobotModel,
                      rclcpp::Node::SharedPtr nodeHandle,
@@ -119,8 +122,9 @@ class HumanoidVisualizer : public DummyObserver {
   void publishCartesianMarkers(const contact_flag_t& contactFlags, const vector_t& state, const vector_t& input) const;
 
   void publishSelfCollisionMarkers(const contact_flag_t& contactFlags, const vector_t& state) const;
+  void publishHandWorkspaceMarkers() const;
 
-  void initializeHandInteractiveMarkers(const std::string& taskFile);
+  void initializeHandInteractiveMarkers(const std::string& taskFile, const std::string& referenceFile);
 
   void updateHandInteractiveMarkers();
 
@@ -135,6 +139,12 @@ class HumanoidVisualizer : public DummyObserver {
   const MpcRobotModelBase<scalar_t>* mpcRobotModelPtr_;
 
   struct HandInteractiveMarker {
+    struct PositionBounds {
+      EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+      vector3_t min = vector3_t::Constant(-std::numeric_limits<scalar_t>::infinity());
+      vector3_t max = vector3_t::Constant(std::numeric_limits<scalar_t>::infinity());
+    };
+
     std::string markerName;
     std::string referenceName;
     std::string linkName;
@@ -145,6 +155,7 @@ class HumanoidVisualizer : public DummyObserver {
       pose.orientation.w = 1.0;
       return pose;
     }();
+    PositionBounds positionBounds;
     bool initialized = false;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr publisher;
   };
@@ -156,6 +167,7 @@ class HumanoidVisualizer : public DummyObserver {
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr markerPublisherPtr_{};
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr collsisionMarkerPublisherPtr_{};
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr stateOptimizedPublisherPtr_{};
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr handWorkspaceMarkerPublisherPtr_{};
 
   scalar_t prevPolicyTime = 0.0;
   vector_t prevPolicyState;
@@ -165,6 +177,7 @@ class HumanoidVisualizer : public DummyObserver {
   std::unique_ptr<interactive_markers::InteractiveMarkerServer> handInteractiveMarkerServerPtr_{};
   std::vector<HandInteractiveMarker> handInteractiveMarkers_;
   mutable std::mutex handInteractiveMarkersMutex_;
+  vector3_t clampHandMarkerPosition(const HandInteractiveMarker& handMarker, const vector3_t& positionInReferenceFrame) const;
 
   const std::string base_link_name_;
 };

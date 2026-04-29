@@ -33,6 +33,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 
+#include <algorithm>
 #include <functional>
 #include <mutex>
 #include <utility>
@@ -55,6 +56,29 @@ Ros2ProceduralMpcMotionManager::Ros2ProceduralMpcMotionManager(
   boost::property_tree::read_info(referenceFile, pt);
   if (const auto handReferenceTransitionDuration = pt.get_optional<scalar_t>("handReferenceTransitionDuration")) {
     handReferenceTransitionDuration_ = std::max<scalar_t>(*handReferenceTransitionDuration, 0.0);
+  }
+  for (const std::string& handName : {"left_hand", "right_hand"}) {
+    HandPositionBounds bounds;
+    const std::string fieldPrefix = "handPositionBounds." + handName;
+    if (const auto optionalMinX = pt.get_optional<scalar_t>(fieldPrefix + ".x_min")) {
+      bounds.min.x() = *optionalMinX;
+    }
+    if (const auto optionalMaxX = pt.get_optional<scalar_t>(fieldPrefix + ".x_max")) {
+      bounds.max.x() = *optionalMaxX;
+    }
+    if (const auto optionalMinY = pt.get_optional<scalar_t>(fieldPrefix + ".y_min")) {
+      bounds.min.y() = *optionalMinY;
+    }
+    if (const auto optionalMaxY = pt.get_optional<scalar_t>(fieldPrefix + ".y_max")) {
+      bounds.max.y() = *optionalMaxY;
+    }
+    if (const auto optionalMinZ = pt.get_optional<scalar_t>(fieldPrefix + ".z_min")) {
+      bounds.min.z() = *optionalMinZ;
+    }
+    if (const auto optionalMaxZ = pt.get_optional<scalar_t>(fieldPrefix + ".z_max")) {
+      bounds.max.z() = *optionalMaxZ;
+    }
+    handPositionBounds_.emplace(handName, bounds);
   }
 }
 
@@ -84,9 +108,32 @@ void Ros2ProceduralMpcMotionManager::subscribe(rclcpp::Node::SharedPtr nodeHandl
 void Ros2ProceduralMpcMotionManager::setHandPoseReference(const std::string& referenceName, const geometry_msgs::msg::PoseStamped& msg) {
   HandPoseReference reference;
   reference.positionInReferenceFrame << msg.pose.position.x, msg.pose.position.y, msg.pose.position.z;
+  reference.positionInReferenceFrame = clampHandPosition(referenceName, reference.positionInReferenceFrame);
   reference.orientationReferenceToHand =
       quaternion_t(msg.pose.orientation.w, msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z).normalized();
   switchedModelReferenceManagerPtr_->getHandPoseReferenceManagerPtr()->setReference(referenceName, reference, handReferenceTransitionDuration_);
+}
+
+vector3_t Ros2ProceduralMpcMotionManager::clampHandPosition(const std::string& referenceName,
+                                                            const vector3_t& positionInReferenceFrame) const {
+  const auto it = handPositionBounds_.find(referenceName);
+  if (it == handPositionBounds_.end()) {
+    return positionInReferenceFrame;
+  }
+
+  vector3_t clampedPosition = positionInReferenceFrame;
+  clampedPosition.x() = std::clamp(clampedPosition.x(), it->second.min.x(), it->second.max.x());
+  clampedPosition.y() = std::clamp(clampedPosition.y(), it->second.min.y(), it->second.max.y());
+  clampedPosition.z() = std::clamp(clampedPosition.z(), it->second.min.z(), it->second.max.z());
+  if (!clampedPosition.isApprox(positionInReferenceFrame)) {
+    auto logger = rclcpp::get_logger("Ros2ProceduralMpcMotionManager");
+    rclcpp::Clock steadyClock(RCL_STEADY_TIME);
+    RCLCPP_WARN_THROTTLE(logger, steadyClock, 1000,
+                         "Clamped %s hand reference from [%.3f %.3f %.3f] to [%.3f %.3f %.3f] in torso frame.",
+                         referenceName.c_str(), positionInReferenceFrame.x(), positionInReferenceFrame.y(), positionInReferenceFrame.z(),
+                         clampedPosition.x(), clampedPosition.y(), clampedPosition.z());
+  }
+  return clampedPosition;
 }
 
 WalkingVelocityCommand Ros2ProceduralMpcMotionManager::getScaledWalkingVelocityCommand() {

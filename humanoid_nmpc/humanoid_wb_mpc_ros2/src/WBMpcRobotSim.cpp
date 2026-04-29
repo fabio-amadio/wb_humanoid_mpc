@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
   qos.best_effort();
 
   std::shared_ptr<HumanoidVisualizer> humanoidVisualizer(
-      new HumanoidVisualizer(taskFile, interface.getPinocchioInterface(), interface.getMpcRobotModel(), nodeHandle));
+      new HumanoidVisualizer(taskFile, referenceFile, interface.getPinocchioInterface(), interface.getMpcRobotModel(), nodeHandle));
 
   // Reference and motion management for Procedural MPC
   WBMpcTargetTrajectoriesCalculator mpcTargetTrajectoriesCalculator(referenceFile, interface.getMpcRobotModel(),

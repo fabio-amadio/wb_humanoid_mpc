@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
   mrt.launchNodes(nodeHandle, qos);
 
   std::shared_ptr<HumanoidVisualizer> humanoidVisualizer(
-      new HumanoidVisualizer(taskFile, interface.getPinocchioInterface(), interface.getMpcRobotModel(), nodeHandle));
+      new HumanoidVisualizer(taskFile, referenceFile, interface.getPinocchioInterface(), interface.getMpcRobotModel(), nodeHandle));
 
   // Dummy legged robot
   MRT_ROS_Dummy_Loop dummySimulator(mrt, 100, interface.mpcSettings().mpcDesiredFrequency_);

@@ -41,6 +41,7 @@ namespace ocs2::humanoid {
 class HumanoidVisualizerRos2Interface : public HumanoidVisualizer {
  public:
   HumanoidVisualizerRos2Interface(const std::string& taskFile,
+                                  const std::string& referenceFile,
                                   PinocchioInterface pinocchioInterface,
                                   const MpcRobotModelBase<scalar_t>& mpcRobotModel,
                                   rclcpp::Node::SharedPtr nodeHandle,

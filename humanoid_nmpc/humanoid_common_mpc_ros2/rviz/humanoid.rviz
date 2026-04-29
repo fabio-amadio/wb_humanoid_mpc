@@ -12,6 +12,7 @@ Panels:
         - /TF1/Frames1
         - /Cartesian Markers1
         - /Cartesian Markers1/Namespaces1
+        - /Hand Workspace Limits1
         - /OptimizedStateTrajectory1
         - /Hand Pose Markers1
         - /CollisionMarkerArray1
@@ -317,6 +318,18 @@ Visualization Manager:
       Show Descriptions: false
       Show Visual Aids: false
       Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: false
+      Name: Hand Workspace Limits
+      Namespaces:
+        hand_workspace: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /hand_workspace_markers
+      Value: false
     - Class: rviz_default_plugins/MarkerArray
       Enabled: false
       Name: CollisionMarkerArray

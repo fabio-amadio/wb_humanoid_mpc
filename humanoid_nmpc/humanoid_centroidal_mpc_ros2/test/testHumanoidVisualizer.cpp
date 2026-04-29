@@ -58,7 +58,7 @@ int main(int argc, char** argv) {
 
   CentroidalMpcInterface interface(taskFile, urdfFile, referenceFile);
 
-  HumanoidVisualizer visualization(taskFile, interface.getPinocchioInterface(), interface.getMpcRobotModel(), node);
+  HumanoidVisualizer visualization(taskFile, referenceFile, interface.getPinocchioInterface(), interface.getMpcRobotModel(), node);
 
   SystemObservation observation;
 

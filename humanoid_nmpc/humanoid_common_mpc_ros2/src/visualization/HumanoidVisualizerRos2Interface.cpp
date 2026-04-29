@@ -39,11 +39,13 @@ namespace ocs2::humanoid {
 /******************************************************************************************************/
 /******************************************************************************************************/
 HumanoidVisualizerRos2Interface::HumanoidVisualizerRos2Interface(const std::string& taskFile,
+                                                                 const std::string& referenceFile,
                                                                  PinocchioInterface pinocchioInterface,
                                                                  const MpcRobotModelBase<scalar_t>& mpcRobotModel,
                                                                  rclcpp::Node::SharedPtr nodeHandle,
                                                                  scalar_t maxUpdateFrequency)
-    : HumanoidVisualizer(taskFile, pinocchioInterface, mpcRobotModel, nodeHandle, maxUpdateFrequency), mRTPolicySubscriper_("humanoid") {}
+    : HumanoidVisualizer(taskFile, referenceFile, pinocchioInterface, mpcRobotModel, nodeHandle, maxUpdateFrequency),
+      mRTPolicySubscriper_("humanoid") {}
 
 /******************************************************************************************************/
 /******************************************************************************************************/
