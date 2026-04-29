@@ -39,6 +39,7 @@ from remote_control import XBoxControllerInterface
 from remote_control.tk_app import JoystickGui, LEDIndicatorGui
 
 DEFAULT_BASE_HEIGHT = 0.7925
+MIN_BASE_HEIGHT = 0.2
 WAIST_YAW_LIMIT_DEG = 90.0
 WAIST_PITCH_LIMIT_DEG = 28.0
 WAIST_ROLL_LIMIT_DEG = 20.0
@@ -144,7 +145,8 @@ class App(tk.Tk):
         self.joystick_right.pack(pady=(5, 5))
 
         # Slider frame
-        self.slider_default_value = 75
+        self.min_base_height = MIN_BASE_HEIGHT
+        self.max_base_height = DEFAULT_BASE_HEIGHT
         self.slider_frame = ttk.Frame(main_frame)
         self.slider_frame.grid(row=0, column=2, padx=15, pady=10, sticky="ns")
 
@@ -153,12 +155,12 @@ class App(tk.Tk):
 
         self.slider = ttk.Scale(
             self.slider_frame,
-            from_=100,
-            to=0,
+            from_=self.max_base_height,
+            to=self.min_base_height,
             orient="vertical",
             command=self.slider_callback,
         )
-        self.slider.set(self.slider_default_value)
+        self.slider.set(self.max_base_height)
         self.slider.pack(expand=True, fill="y")
         self.slider.bind("<ButtonRelease-1>", self.on_slider_release)
 
@@ -272,7 +274,7 @@ class App(tk.Tk):
 
     def on_slider_release(self, event):
         if self.auto_center_var.get():
-            self.slider.set(self.slider_default_value)
+            self.slider.set(self.max_base_height)
 
     def on_waist_slider_release(self, event):
         if self.auto_center_var.get():
@@ -283,7 +285,7 @@ class App(tk.Tk):
     def center_all(self):
         self.joystick_left.set_position()
         self.joystick_right.set_position()
-        self.slider.set(self.slider_default_value)
+        self.slider.set(self.max_base_height)
         self.waist_yaw_slider.set(0.0)
         self.waist_roll_slider.set(0.0)
         self.waist_pitch_slider.set(0.0)
@@ -291,7 +293,7 @@ class App(tk.Tk):
     def set_knob_positions(self, msg: WalkingVelocityCommand):
         self.joystick_left.set_position(msg.linear_velocity_x, msg.linear_velocity_y)
         self.joystick_right.set_position(0.0, msg.angular_velocity_z)
-        self.slider.set((msg.desired_pelvis_height - 0.2) / 0.008)
+        self.slider.set(msg.desired_pelvis_height)
         self.waist_yaw_slider.set(math.degrees(msg.desired_waist_yaw))
         self.waist_roll_slider.set(math.degrees(msg.desired_waist_roll))
         self.waist_pitch_slider.set(math.degrees(msg.desired_waist_pitch))
@@ -303,7 +305,9 @@ class App(tk.Tk):
         msg.linear_velocity_y = self.joystick_left.y_norm
         msg.angular_velocity_z = self.joystick_right.y_norm
 
-        msg.desired_pelvis_height = min(self.slider.get() * 0.008 + 0.2, DEFAULT_BASE_HEIGHT)
+        msg.desired_pelvis_height = min(
+            max(self.slider.get(), self.min_base_height), self.max_base_height
+        )
         msg.desired_waist_yaw = math.radians(self.waist_yaw_slider.get())
         msg.desired_waist_roll = math.radians(self.waist_roll_slider.get())
         msg.desired_waist_pitch = math.radians(self.waist_pitch_slider.get())
