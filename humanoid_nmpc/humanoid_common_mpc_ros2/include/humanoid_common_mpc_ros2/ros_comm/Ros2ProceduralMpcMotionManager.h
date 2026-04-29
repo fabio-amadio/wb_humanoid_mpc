@@ -32,6 +32,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rclcpp/rclcpp.hpp>
 
+#include <cmath>
 #include <limits>
 #include <mutex>
 #include <unordered_map>
@@ -73,17 +74,31 @@ class Ros2ProceduralMpcMotionManager : public ProceduralMpcMotionManager {
     vector3_t max = vector3_t::Constant(std::numeric_limits<scalar_t>::infinity());
   };
 
-  WalkingVelocityCommand getScaledWalkingVelocityCommand() override;
+  struct WaistYawBounds {
+    scalar_t min = -1.57079632679;
+    scalar_t max = 1.57079632679;
+  };
+
+  WalkingVelocityCommand getScaledWalkingVelocityCommand(scalar_t time) override;
 
   void setHandPoseReference(const std::string& referenceName, const geometry_msgs::msg::PoseStamped& msg);
   vector3_t clampHandPosition(const std::string& referenceName, const vector3_t& positionInReferenceFrame) const;
+  scalar_t clampWaistYaw(scalar_t desiredWaistYaw) const;
+  scalar_t interpolateWaistYaw(scalar_t time) const;
 
   rclcpp::Subscription<humanoid_mpc_msgs::msg::WalkingVelocityCommand>::SharedPtr velCommandSubscriber_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr leftHandPoseSubscriber_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr rightHandPoseSubscriber_;
   std::mutex walkingVelCommandMutex_;
   scalar_t handReferenceTransitionDuration_ = 0.3;
+  scalar_t waistReferenceTransitionDuration_ = 0.3;
   std::unordered_map<std::string, HandPositionBounds> handPositionBounds_;
+  WaistYawBounds waistYawBounds_;
+  scalar_t currentSolverTime_ = 0.0;
+  scalar_t waistYawTransitionStartTime_ = 0.0;
+  scalar_t waistYawStartReference_ = 0.0;
+  scalar_t waistYawGoalReference_ = 0.0;
+  bool waistYawReferenceInitialized_ = false;
   std::string robotName_;
 };
 

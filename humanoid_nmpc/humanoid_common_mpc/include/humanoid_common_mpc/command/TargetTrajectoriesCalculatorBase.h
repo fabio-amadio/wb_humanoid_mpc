@@ -35,6 +35,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ocs2_core/reference/TargetTrajectories.h>
 #include <ocs2_mpc/SystemObservation.h>
 
+#include <humanoid_common_mpc/command/WalkingVelocityCommand.h>
 #include <humanoid_common_mpc/common/ModelSettings.h>
 #include <humanoid_common_mpc/common/Types.h>
 #include "humanoid_common_mpc/common/MpcRobotModelBase.h"
@@ -68,7 +69,7 @@ class TargetTrajectoriesCalculatorBase {
    * @param [in] commandedVelocities : [v_x, v_y, v_yaw] defined in pelvis frame
    * @param [in] observation : the current observation
    */
-  virtual TargetTrajectories commandedVelocityToTargetTrajectories(const vector4_t& commandedVelocities,
+  virtual TargetTrajectories commandedVelocityToTargetTrajectories(const WalkingVelocityCommand& commandedVelocities,
                                                                    scalar_t initTime,
                                                                    const vector_t& initState) = 0;
 

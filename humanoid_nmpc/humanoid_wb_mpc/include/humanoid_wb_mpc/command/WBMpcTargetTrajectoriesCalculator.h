@@ -63,7 +63,7 @@ class WBMpcTargetTrajectoriesCalculator : public TargetTrajectoriesCalculatorBas
    * @param [in] commandedVelocities : [v_x, v_y, v_yaw] defined in pelvis frame
    * @param [in] observation : the current observation
    */
-  TargetTrajectories commandedVelocityToTargetTrajectories(const vector4_t& commandedVelocities,
+  TargetTrajectories commandedVelocityToTargetTrajectories(const WalkingVelocityCommand& commandedVelocities,
                                                            scalar_t initTime,
                                                            const vector_t& initState) override;
 };

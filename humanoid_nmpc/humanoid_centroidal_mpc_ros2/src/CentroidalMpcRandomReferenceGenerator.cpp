@@ -972,6 +972,7 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
   std::string currentGaitCommand = gaitModeStates[currentGaitMode].gaitCommand;
   std::string lastGaitCommand = currentGaitCommand;
   scalar_t lastGaitChangeTime = 0.0;
+  const size_t waistYawJointIndex = mpcRobotModel.getJointIndex("waist_yaw_joint");
 
   CentroidalMpcTargetTrajectoriesCalculator targetCalculator(options.referenceFile, mpcRobotModel, interface.getPinocchioInterface(),
                                                              interface.getCentroidalModelInfo(), interface.mpcSettings().timeHorizon_);
@@ -982,8 +983,8 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
   observation.input = vector_t::Zero(interface.getCentroidalModelInfo().inputDim);
   observation.mode = ModeNumber::STANCE;
 
-  vector4_t initialVelocityTarget;
-  initialVelocityTarget << 0.0, 0.0, defaultBaseHeight, 0.0;
+  WalkingVelocityCommand initialVelocityTarget;
+  initialVelocityTarget.desired_pelvis_height = defaultBaseHeight;
   for (int i = 0; i < 20; ++i) {
     targetCalculator.commandedVelocityToTargetTrajectories(initialVelocityTarget, observation.time, observation.state);
   }
@@ -1040,20 +1041,24 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
       velocityTarget[1] = 0.0;
       velocityTarget[3] = 0.0;
     }
-    vector4_t filteredVelCommand = velocityCommandFilter.getFilteredVector(velocityTarget);
+    WalkingVelocityCommand filteredCommand;
+    filteredCommand.setFromVector(velocityCommandFilter.getFilteredVector(velocityTarget));
     const auto [useHeading, headingTarget] = headingSchedule.value(time);
     if (!forceStance && useHeading) {
       // Base pose layout is [x, y, z, yaw, pitch, roll].
       const scalar_t baseYaw = mpcRobotModel.getBasePose(observation.state)[3];
       const scalar_t yawRate = options.headingControlStiffness * wrapToPi(headingTarget - baseYaw);
-      filteredVelCommand[3] = std::clamp(yawRate, options.yawRateMin, options.yawRateMax);
+      filteredCommand.angular_velocity_z = std::clamp(yawRate, options.yawRateMin, options.yawRateMax);
     }
     if (forceStance) {
-      filteredVelCommand[0] = 0.0;
-      filteredVelCommand[1] = 0.0;
-      filteredVelCommand[3] = 0.0;
+      filteredCommand.linear_velocity_x = 0.0;
+      filteredCommand.linear_velocity_y = 0.0;
+      filteredCommand.angular_velocity_z = 0.0;
     }
+    vector4_t filteredVelCommand = filteredCommand.toVector();
     applyBaseCommandDeadband(filteredVelCommand, options.baseCommandDeadband);
+    filteredCommand.setFromVector(filteredVelCommand);
+    filteredCommand.desired_waist_yaw = sampledMpcJointState[waistYawJointIndex];
     const vector6_t baseVelocity = mpcRobotModel.getBaseComVelocity(observation.state);
     auto currentCfg = gaitModeStates[currentGaitMode];
 
@@ -1091,7 +1096,7 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
 
     targetCalculator.setTargetJointState(sampledMpcJointState);
     TargetTrajectories targetTrajectories =
-        targetCalculator.commandedVelocityToTargetTrajectories(filteredVelCommand, time, observation.state);
+        targetCalculator.commandedVelocityToTargetTrajectories(filteredCommand, time, observation.state);
     mrt.getReferenceManager().setTargetTrajectories(targetTrajectories);
 
     mrt.setCurrentObservation(observation);

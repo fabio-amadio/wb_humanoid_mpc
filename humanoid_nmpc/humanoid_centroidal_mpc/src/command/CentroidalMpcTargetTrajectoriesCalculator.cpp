@@ -49,7 +49,8 @@ CentroidalMpcTargetTrajectoriesCalculator::CentroidalMpcTargetTrajectoriesCalcul
     : TargetTrajectoriesCalculatorBase(referenceFile, mpcRobotModel, mpcHorizon),
       pinocchioInterface_(pinocchioInterface),
       info_(info),
-      mass_(pinocchio::computeTotalMass(pinocchioInterface.getModel())) {}
+      mass_(pinocchio::computeTotalMass(pinocchioInterface.getModel())),
+      waistYawJointIndex_(mpcRobotModel.getJointIndex("waist_yaw_joint")) {}
 
 /******************************************************************************************************/
 /******************************************************************************************************/
@@ -84,14 +85,16 @@ TargetTrajectories CentroidalMpcTargetTrajectoriesCalculator::commandedPositionT
 /******************************************************************************************************/
 /******************************************************************************************************/
 
-TargetTrajectories CentroidalMpcTargetTrajectoriesCalculator::commandedVelocityToTargetTrajectories(const vector4_t& commandedVelocities,
+TargetTrajectories CentroidalMpcTargetTrajectoriesCalculator::commandedVelocityToTargetTrajectories(const WalkingVelocityCommand& commandedVelocities,
                                                                                                     scalar_t initTime,
                                                                                                     const vector_t& initState) {
   // Smoothly transition from the current base motion reference to the commanded one over the first part of the horizon.
 
   vector_t currentPoseTarget = getCurrentBasePoseTarget(initState);
+  vector_t targetJointState = targetJointState_;
+  targetJointState(waistYawJointIndex_) = commandedVelocities.desired_waist_yaw;
 
-  vector4_t commVelTargetGlobal = filterAndTransformVelCommandToLocal(commandedVelocities, currentPoseTarget(3), 0.8);
+  vector4_t commVelTargetGlobal = filterAndTransformVelCommandToLocal(commandedVelocities.toVector(), currentPoseTarget(3), 0.8);
 
   updateCentroidalDynamics(pinocchioInterface_, info_, mpcRobotModelPtr_->getGeneralizedCoordinates(initState));
   const Eigen::Matrix<scalar_t, 6, Eigen::Dynamic>& A = getCentroidalMomentumMatrix(pinocchioInterface_);
@@ -143,7 +146,7 @@ TargetTrajectories CentroidalMpcTargetTrajectoriesCalculator::commandedVelocityT
 
     timeTrajectory.push_back(initTime + relativeTime);
     stateTrajectory.emplace_back(vector_t::Zero(mpcRobotModelPtr_->getStateDim()));
-    stateTrajectory.back() << momentumRef, poseAtKnot, targetJointState_;
+    stateTrajectory.back() << momentumRef, poseAtKnot, targetJointState;
     inputTrajectory.emplace_back(vector_t::Zero(mpcRobotModelPtr_->getInputDim()));
 
     previousVelocityRef = velocityRef;

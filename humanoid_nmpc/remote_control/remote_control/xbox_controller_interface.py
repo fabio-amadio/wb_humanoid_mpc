@@ -170,6 +170,7 @@ class XBoxControllerInterface:
                     self.max_pelvis_height,
                 )
                 msg.desired_pelvis_height = self.current_pelvis_height_target
+                msg.desired_waist_yaw = 0.0
                 return True, msg
             except:
 

@@ -30,6 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import tkinter as tk
 from tkinter import ttk
 import threading
+import math
 import rclpy
 from rclpy.node import Node
 from humanoid_mpc_msgs.msg import WalkingVelocityCommand
@@ -38,14 +39,15 @@ from remote_control import XBoxControllerInterface
 from remote_control.tk_app import JoystickGui, LEDIndicatorGui
 
 DEFAULT_BASE_HEIGHT = 0.7925
+WAIST_YAW_LIMIT_DEG = 90.0
 
 
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Robot Base Controller")
-        self.geometry("800x400")
-        self.minsize(800, 400)
+        self.geometry("900x500")
+        self.minsize(900, 500)
 
         # Set window background color
         self.configure(bg="#2c2c2c")
@@ -102,6 +104,12 @@ class App(tk.Tk):
             troughcolor="#363636",
             bordercolor="#4a90e2",
         )
+        style.configure(
+            "Horizontal.TScale",
+            background="#2c2c2c",
+            troughcolor="#363636",
+            bordercolor="#4a90e2",
+        )
 
         self.auto_center_var = tk.BooleanVar(value=False)
 
@@ -152,9 +160,28 @@ class App(tk.Tk):
         self.slider.pack(expand=True, fill="y")
         self.slider.bind("<ButtonRelease-1>", self.on_slider_release)
 
+        self.waist_slider_frame = ttk.Frame(main_frame)
+        self.waist_slider_frame.grid(
+            row=1, column=0, columnspan=3, padx=15, pady=(0, 10), sticky="ew"
+        )
+
+        self.waist_slider_label = ttk.Label(self.waist_slider_frame, text="Waist Yaw")
+        self.waist_slider_label.pack(pady=(0, 5))
+
+        self.waist_slider = ttk.Scale(
+            self.waist_slider_frame,
+            from_=-WAIST_YAW_LIMIT_DEG,
+            to=WAIST_YAW_LIMIT_DEG,
+            orient="horizontal",
+            command=self.waist_slider_callback,
+        )
+        self.waist_slider.set(0.0)
+        self.waist_slider.pack(fill="x", padx=30)
+        self.waist_slider.bind("<ButtonRelease-1>", self.on_waist_slider_release)
+
         # Control frame
         control_frame = ttk.Frame(main_frame)
-        control_frame.grid(row=1, column=0, columnspan=5, pady=(10, 0))
+        control_frame.grid(row=2, column=0, columnspan=3, pady=(10, 0))
 
         # Create LED
         self.joystick_connected_indicator = LEDIndicatorGui(
@@ -176,10 +203,15 @@ class App(tk.Tk):
         self.auto_center_checkbox.pack(side="left")
 
         main_frame.rowconfigure(0, weight=1)
+        main_frame.rowconfigure(1, weight=0)
         main_frame.columnconfigure(0, weight=1)
         main_frame.columnconfigure(1, weight=1)
+        main_frame.columnconfigure(2, weight=0)
 
     def slider_callback(self, value):
+        pass
+
+    def waist_slider_callback(self, value):
         pass
 
     def set_joystick_connected(self, is_connected):
@@ -202,15 +234,21 @@ class App(tk.Tk):
         if self.auto_center_var.get():
             self.slider.set(self.slider_default_value)
 
+    def on_waist_slider_release(self, event):
+        if self.auto_center_var.get():
+            self.waist_slider.set(0.0)
+
     def center_all(self):
         self.joystick_left.set_position()
         self.joystick_right.set_position()
         self.slider.set(self.slider_default_value)
+        self.waist_slider.set(0.0)
 
     def set_knob_positions(self, msg: WalkingVelocityCommand):
         self.joystick_left.set_position(msg.linear_velocity_x, msg.linear_velocity_y)
         self.joystick_right.set_position(0.0, msg.angular_velocity_z)
         self.slider.set((msg.desired_pelvis_height - 0.2) / 0.008)
+        self.waist_slider.set(math.degrees(msg.desired_waist_yaw))
 
     def get_walking_command_msg(self):
         msg = WalkingVelocityCommand()
@@ -220,6 +258,7 @@ class App(tk.Tk):
         msg.angular_velocity_z = self.joystick_right.y_norm
 
         msg.desired_pelvis_height = min(self.slider.get() * 0.008 + 0.2, DEFAULT_BASE_HEIGHT)
+        msg.desired_waist_yaw = math.radians(self.waist_slider.get())
         return msg
 
 

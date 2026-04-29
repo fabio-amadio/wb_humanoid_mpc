@@ -23,6 +23,11 @@ module humanoid_mpc_msgs {
        * Between [-1, 1] for no to max velocity
        */
       double angular_velocity_z;
+
+      /**
+       * Desired waist yaw joint angle in [rad]
+       */
+      double desired_waist_yaw;
     };
   };
 };

@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
   WBMpcTargetTrajectoriesCalculator mpcTargetTrajectoriesCalculator(referenceFile, interface.getMpcRobotModel(),
                                                                     interface.mpcSettings().timeHorizon_);
   ProceduralMpcMotionManager::VelocityTargetToTargetTrajectories targetTrajectoriesFunc =
-      [&mpcTargetTrajectoriesCalculator](const vector4_t& velocityTarget, scalar_t initTime, scalar_t finalTime,
+      [&mpcTargetTrajectoriesCalculator](const WalkingVelocityCommand& velocityTarget, scalar_t initTime, scalar_t finalTime,
                                          const vector_t& initState) mutable {
         return mpcTargetTrajectoriesCalculator.commandedVelocityToTargetTrajectories(velocityTarget, initTime, initState);
       };

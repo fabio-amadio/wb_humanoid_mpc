@@ -77,7 +77,7 @@ TargetTrajectories WBMpcTargetTrajectoriesCalculator::commandedPositionToTargetT
 /******************************************************************************************************/
 /******************************************************************************************************/
 
-TargetTrajectories WBMpcTargetTrajectoriesCalculator::commandedVelocityToTargetTrajectories(const vector4_t& commandedVelocities,
+TargetTrajectories WBMpcTargetTrajectoriesCalculator::commandedVelocityToTargetTrajectories(const WalkingVelocityCommand& commandedVelocities,
                                                                                             scalar_t initTime,
                                                                                             const vector_t& initState) {
   // This function constructs a target trajectory that interpolates between the current momentum and desired momentum for the first part
@@ -85,7 +85,7 @@ TargetTrajectories WBMpcTargetTrajectoriesCalculator::commandedVelocityToTargetT
   // velocity profile.
 
   vector_t currentPoseTarget = getCurrentBasePoseTarget(initState);
-  vector4_t commVelTargetGlobal = filterAndTransformVelCommandToLocal(commandedVelocities, currentPoseTarget(3), 0.8);
+  vector4_t commVelTargetGlobal = filterAndTransformVelCommandToLocal(commandedVelocities.toVector(), currentPoseTarget(3), 0.8);
 
   // // Adapt desired base height from velocity command
   // currentPoseTarget[2] = commVelTargetGlobal[2];

@@ -120,11 +120,13 @@ void ProceduralMpcMotionManager::preSolverRun(scalar_t initTime,
                                               scalar_t finalTime,
                                               const vector_t& initState,
                                               const ReferenceManagerInterface& referenceManager) {
-  WalkingVelocityCommand incommingVelCommand = getScaledWalkingVelocityCommand();
+  WalkingVelocityCommand incommingVelCommand = getScaledWalkingVelocityCommand(initTime);
   vector4_t filteredVelCommand = velocityCommandFilter.getFilteredVector(incommingVelCommand.toVector());
+  WalkingVelocityCommand filteredCommand = incommingVelCommand;
+  filteredCommand.setFromVector(filteredVelCommand);
 
   // Update TargetTrajectories
-  TargetTrajectories targetTrajectories = velocityTargetToTargetTrajectoriesFun_(filteredVelCommand, initTime, finalTime, initState);
+  TargetTrajectories targetTrajectories = velocityTargetToTargetTrajectoriesFun_(filteredCommand, initTime, finalTime, initState);
   switchedModelReferenceManagerPtr_->setTargetTrajectories(targetTrajectories);
 
   static GaitModeStateConfig currentCfg = gaitModeStates_[currentGaitMode_];
