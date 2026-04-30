@@ -45,14 +45,6 @@ From the same `docker` directory:
 
 This script starts a container named `wb-mpc-dev`, mounts the repository into `/wb_humanoid_mpc_ws/src/wb_humanoid_mpc`, and keeps workspace artifacts on the host in `.docker_ws/`. If the container is already running, re-running the same script opens a new shell inside it with the ROS environment and workspace overlay sourced automatically.
 
-The container defaults to:
-
-```bash
-RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-```
-
-If you inspect ROS 2 topics from another terminal or another container, use the same middleware setting there too.
-
 ## Build Inside Docker
 
 Once inside the container:
