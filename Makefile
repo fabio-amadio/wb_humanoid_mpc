@@ -187,31 +187,25 @@ format:
 	find . -name "lib" -prune -o \( -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) -print | xargs clang-format -i && \
 	black . --exclude="lib/"
 
-launch-g1-dummy-sim:
+launch-g1-dummy-sim-locomotion:
 	cd ${build_dir} && \
 	source ${ros_source_file} && \
 	source install/setup.bash && \
-	ros2 launch g1_centroidal_mpc dummy_sim.launch.py 
+	ros2 launch g1_centroidal_mpc dummy_sim.launch.py
 
-launch-g1-dummy-sim-refs:
-	cd ${build_dir} && \
-	source ${ros_source_file} && \
-	source install/setup.bash && \
-	ros2 launch g1_centroidal_mpc dummy_sim.launch.py publish_reference_joint_states:=true
-
-launch-g1-dummy-sim-mpc-motion-reference:
+launch-g1-dummy-sim-locomotion-pub-mpc-motion-ref:
 	cd ${build_dir} && \
 	source ${ros_source_file} && \
 	source install/setup.bash && \
 	ros2 launch g1_centroidal_mpc dummy_sim.launch.py publish_mpc_motion_reference:=true
 
-launch-g1-dummy-sim-hands-cartesian:
+launch-g1-dummy-sim-hand-pose:
 	cd ${build_dir} && \
 	source ${ros_source_file} && \
 	source install/setup.bash && \
 	ros2 launch g1_centroidal_mpc dummy_sim_hands_cartesian.launch.py
 
-launch-g1-dummy-sim-hands-cartesian-mpc-motion-reference:
+launch-g1-dummy-sim-hand-pose-pub-mpc-motion-ref:
 	cd ${build_dir} && \
 	source ${ros_source_file} && \
 	source install/setup.bash && \
@@ -227,30 +221,18 @@ generate-g1-random-mpc-npz:
 		--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz \
 		$(GENERATOR_ARGS)
 
-launch-g1-sim:
+launch-g1-sim-locomotion:
 	cd ${build_dir} && \
 	source ${ros_source_file} && \
 	source install/setup.bash && \
-	ros2 launch g1_centroidal_mpc mujoco_sim.launch.py 
+	ros2 launch g1_centroidal_mpc mujoco_sim.launch.py
 
-launch-g1-sim-refs:
+launch-g1-sim-hand-pose:
 	cd ${build_dir} && \
 	source ${ros_source_file} && \
 	source install/setup.bash && \
-	ros2 launch g1_centroidal_mpc mujoco_sim.launch.py publish_reference_joint_states:=true
+	ros2 launch g1_centroidal_mpc mujoco_sim_hands_cartesian.launch.py
 
-
-launch-wb-g1-dummy-sim:
-	cd ${build_dir} && \
-	source ${ros_source_file} && \
-	source install/setup.bash && \
-	ros2 launch g1_wb_mpc dummy_sim.launch.py 
-
-launch-wb-g1-sim:
-	cd ${build_dir} && \
-	source ${ros_source_file} && \
-	source install/setup.bash && \
-	ros2 launch g1_wb_mpc mujoco_sim.launch.py 
 
 run-ocs2-tests:
 	echo "make sure you call 'make build-relwithdebinfo' to build the tests before running them." && \
@@ -266,4 +248,4 @@ run-mpc-tests:
 	source ${ros_source_file} && \
 	source install/setup.bash && \
 	colcon test --event-handlers console_direct+ --return-code-on-test-failure --packages-select humanoid_common_mpc \
-	humanoid_common_mpc_ros2 humanoid_centroidal_mpc humanoid_centroidal_mpc_ros2 humanoid_wb_mpc
+	humanoid_common_mpc_ros2 humanoid_centroidal_mpc humanoid_centroidal_mpc_ros2

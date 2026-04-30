@@ -50,11 +50,8 @@ namespace ocs2::humanoid {
 
 class ProceduralMpcMotionManager : public SolverSynchronizedModule {
  public:
-  using VelocityTargetToTargetTrajectories =
-      std::function<TargetTrajectories(const WalkingVelocityCommand& velocityTarget,
-                                       scalar_t initTime,
-                                       scalar_t finalTime,
-                                       const vector_t& initState)>;
+  using VelocityTargetToTargetTrajectories = std::function<TargetTrajectories(
+      const WalkingVelocityCommand& velocityTarget, scalar_t initTime, scalar_t finalTime, const vector_t& initState)>;
 
   struct GaitModeStateConfig {
     std::string gaitCommand = "stance";
@@ -100,7 +97,7 @@ class ProceduralMpcMotionManager : public SolverSynchronizedModule {
    *
    * @param primalSolution : primalSolution
    */
-  void postSolverRun(const PrimalSolution& primalSolution) override {};
+  void postSolverRun(const PrimalSolution& primalSolution) override{};
 
   virtual void setAndScaleVelocityCommand(const WalkingVelocityCommand& rawVelocityCommand);
 

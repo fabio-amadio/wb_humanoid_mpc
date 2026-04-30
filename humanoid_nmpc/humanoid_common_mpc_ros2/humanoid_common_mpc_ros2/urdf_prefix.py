@@ -34,7 +34,9 @@ def prefix_urdf_links(urdf_path: str, link_prefix: str) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Prefix URDF link names and link references.")
+    parser = argparse.ArgumentParser(
+        description="Prefix URDF link names and link references."
+    )
     parser.add_argument("urdf_path")
     parser.add_argument("link_prefix")
     args = parser.parse_args()

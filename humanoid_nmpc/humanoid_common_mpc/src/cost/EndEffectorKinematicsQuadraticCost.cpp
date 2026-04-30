@@ -40,16 +40,17 @@ namespace ocs2::humanoid {
 /******************************************************************************************************/
 /******************************************************************************************************/
 
-EndEffectorKinematicsQuadraticCost::EndEffectorKinematicsQuadraticCost(EndEffectorKinematicsWeights weights,
-                                                                       const PinocchioInterface& pinocchioInterface,
-                                                                       const EndEffectorKinematics<scalar_t>& endEffectorKinematics,
-                                                                       const MpcRobotModelBase<scalar_t>& mpcRobotModel,
-                                                                       const MpcRobotModelBase<ad_scalar_t>& mpcRobotModelAD,
-                                                                       std::string endEffectorName,
-                                                                       const ModelSettings& modelSettings,
-                                                                       std::shared_ptr<HandPoseReferenceManager> handPoseReferenceManagerPtr,
-                                                                       std::string handPoseReferenceName,
-                                                                       std::string referenceFrameName)
+EndEffectorKinematicsQuadraticCost::EndEffectorKinematicsQuadraticCost(
+    EndEffectorKinematicsWeights weights,
+    const PinocchioInterface& pinocchioInterface,
+    const EndEffectorKinematics<scalar_t>& endEffectorKinematics,
+    const MpcRobotModelBase<scalar_t>& mpcRobotModel,
+    const MpcRobotModelBase<ad_scalar_t>& mpcRobotModelAD,
+    std::string endEffectorName,
+    const ModelSettings& modelSettings,
+    std::shared_ptr<HandPoseReferenceManager> handPoseReferenceManagerPtr,
+    std::string handPoseReferenceName,
+    std::string referenceFrameName)
     : StateInputCostGaussNewtonAd(),
       sqrtWeights_(weights.toVector().cwiseSqrt()),
       pinocchioInterface_(pinocchioInterface),
@@ -106,8 +107,8 @@ vector_t EndEffectorKinematicsQuadraticCost::getParameters(scalar_t time,
   const vector_t xRef = targetTrajectories.getDesiredState(time);
   const vector_t uRef = targetTrajectories.getDesiredInput(time);
 
-  const auto handPoseReference = handPoseReferenceManagerPtr_ != nullptr ? handPoseReferenceManagerPtr_->getReference(handPoseReferenceName_, time)
-                                                                         : std::nullopt;
+  const auto handPoseReference =
+      handPoseReferenceManagerPtr_ != nullptr ? handPoseReferenceManagerPtr_->getReference(handPoseReferenceName_, time) : std::nullopt;
   vector_t parameters(n_parameters_);
   parameters << (handPoseReference.has_value() ? getExternalReferenceCostElement(xRef, uRef, *handPoseReference)
                                                : getReferenceCostElement(xRef, uRef, *endEffectorKinematicsPtr_))
@@ -144,7 +145,8 @@ EndEffectorKinematicsCostElement<scalar_t> EndEffectorKinematicsQuadraticCost::g
   pinocchio::updateFramePlacements(model, data);
   const auto& referenceFramePose = data.oMf[referenceFrameID_];
   const quaternion_t orientationWorldToReference(referenceFramePose.rotation());
-  costElement.setPosition(referenceFramePose.translation() + orientationWorldToReference * referenceFrameReference.positionInReferenceFrame);
+  costElement.setPosition(referenceFramePose.translation() +
+                          orientationWorldToReference * referenceFrameReference.positionInReferenceFrame);
   costElement.setOrientation(orientationWorldToReference * referenceFrameReference.orientationReferenceToHand);
 
   return costElement;

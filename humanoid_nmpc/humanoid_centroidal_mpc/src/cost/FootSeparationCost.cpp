@@ -109,8 +109,7 @@ ad_vector_t FootSeparationCost::costVectorFunction(ad_scalar_t time,
   const ad_vector_t q = mpcRobotModelAdPtr_->getGeneralizedCoordinates(state);
   pinocchio::forwardKinematics(model, data, q);
 
-  const ad_vector3_t leftFootPosition =
-      pinocchio::updateFramePlacement(model, data, model.getFrameId(config_.leftFootFrame)).translation();
+  const ad_vector3_t leftFootPosition = pinocchio::updateFramePlacement(model, data, model.getFrameId(config_.leftFootFrame)).translation();
   const ad_vector3_t rightFootPosition =
       pinocchio::updateFramePlacement(model, data, model.getFrameId(config_.rightFootFrame)).translation();
 

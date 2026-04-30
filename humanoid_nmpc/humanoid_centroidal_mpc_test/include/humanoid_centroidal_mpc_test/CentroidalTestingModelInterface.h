@@ -52,7 +52,7 @@ struct CentroidalTestingModelInterface {
   std::unique_ptr<CentroidalMpcRobotModel<ad_scalar_t>> mpcRobotModelADPtr_;
 
   CentroidalTestingModelInterface() {
-    taskFile = ament_index_cpp::get_package_share_directory("g1_centroidal_mpc") + "/config/mpc/task.info";
+    taskFile = ament_index_cpp::get_package_share_directory("g1_centroidal_mpc") + "/config/mpc/task_locomotion.info";
 
     urdfFile = ament_index_cpp::get_package_share_directory("g1_description") + "/urdf/g1_29dof.urdf";
 

@@ -37,7 +37,6 @@ from datetime import datetime
 
 
 class MpcObservationLogger(Node):
-
     def __init__(self):
         super().__init__("mpc_observation_subscriber")
         print("Setting up MPC observation logger...")

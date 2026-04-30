@@ -39,10 +39,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <algorithm>
 #include <boost/property_tree/info_parser.hpp>
-#include <visualization_msgs/msg/marker.hpp>
-#include <visualization_msgs/msg/marker_array.hpp>
 #include <visualization_msgs/msg/interactive_marker.hpp>
 #include <visualization_msgs/msg/interactive_marker_control.hpp>
+#include <visualization_msgs/msg/marker.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 #include "humanoid_common_mpc_ros2/visualization/HumanoidVisualizer.h"
 
@@ -76,11 +76,8 @@ geometry_msgs::msg::Pose toPoseMsg(const vector3_t& position, const quaternion_t
   return pose;
 }
 
-visualization_msgs::msg::InteractiveMarkerControl makeAxisControl(const std::string& name,
-                                                                  uint8_t interactionMode,
-                                                                  double x,
-                                                                  double y,
-                                                                  double z) {
+visualization_msgs::msg::InteractiveMarkerControl makeAxisControl(
+    const std::string& name, uint8_t interactionMode, double x, double y, double z) {
   visualization_msgs::msg::InteractiveMarkerControl control;
   control.name = name;
   control.orientation.w = 1.0;
@@ -146,10 +143,8 @@ void HumanoidVisualizer::mpcObservationCallback(const ocs2_ros2_msgs::msg::MpcOb
 void HumanoidVisualizer::createVisualizationPublishers() {
   tfBroadcasterPtr_.reset(new tf2_ros::TransformBroadcaster(node_handle_));
   jointPublisherPtr_ = node_handle_->create_publisher<sensor_msgs::msg::JointState>("mpc/joint_states", 1);
-  terminalJointPublisherPtr_ =
-      node_handle_->create_publisher<sensor_msgs::msg::JointState>("terminal_state/joint_states", 1);
-  terminalJointTargetPublisherPtr_ =
-      node_handle_->create_publisher<sensor_msgs::msg::JointState>("terminal_target/joint_states", 1);
+  terminalJointPublisherPtr_ = node_handle_->create_publisher<sensor_msgs::msg::JointState>("terminal_state/joint_states", 1);
+  terminalJointTargetPublisherPtr_ = node_handle_->create_publisher<sensor_msgs::msg::JointState>("terminal_target/joint_states", 1);
   markerPublisherPtr_ = node_handle_->create_publisher<visualization_msgs::msg::MarkerArray>("cartesian_markers", 1);
   collsisionMarkerPublisherPtr_ = node_handle_->create_publisher<visualization_msgs::msg::MarkerArray>("collision_markers", 1);
   stateOptimizedPublisherPtr_ = node_handle_->create_publisher<visualization_msgs::msg::MarkerArray>("optimized_state_markers", 1);
@@ -186,8 +181,7 @@ void HumanoidVisualizer::initializeHandInteractiveMarkers(const std::string& tas
     }
 
     if (!handInteractiveMarkerServerPtr_) {
-      handInteractiveMarkerServerPtr_ =
-          std::make_unique<interactive_markers::InteractiveMarkerServer>("hand_pose_markers", node_handle_);
+      handInteractiveMarkerServerPtr_ = std::make_unique<interactive_markers::InteractiveMarkerServer>("hand_pose_markers", node_handle_);
     }
 
     HandInteractiveMarker handMarker;
@@ -279,20 +273,15 @@ void HumanoidVisualizer::updateHandInteractiveMarkers() {
     marker.controls.push_back(visualControl);
 
     marker.controls.push_back(makeAxisControl("move_x", visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS, 1.0, 0.0, 0.0));
-    marker.controls.push_back(
-        makeAxisControl("move_y", visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS, 0.0, 0.0, 1.0));
-    marker.controls.push_back(
-        makeAxisControl("move_z", visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS, 0.0, 1.0, 0.0));
-    marker.controls.push_back(
-        makeAxisControl("rotate_x", visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS, 1.0, 0.0, 0.0));
-    marker.controls.push_back(
-        makeAxisControl("rotate_y", visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS, 0.0, 0.0, 1.0));
-    marker.controls.push_back(
-        makeAxisControl("rotate_z", visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS, 0.0, 1.0, 0.0));
+    marker.controls.push_back(makeAxisControl("move_y", visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS, 0.0, 0.0, 1.0));
+    marker.controls.push_back(makeAxisControl("move_z", visualization_msgs::msg::InteractiveMarkerControl::MOVE_AXIS, 0.0, 1.0, 0.0));
+    marker.controls.push_back(makeAxisControl("rotate_x", visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS, 1.0, 0.0, 0.0));
+    marker.controls.push_back(makeAxisControl("rotate_y", visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS, 0.0, 0.0, 1.0));
+    marker.controls.push_back(makeAxisControl("rotate_z", visualization_msgs::msg::InteractiveMarkerControl::ROTATE_AXIS, 0.0, 1.0, 0.0));
 
     handInteractiveMarkerServerPtr_->insert(
-        marker, [this, markerName = handMarker.markerName](
-                    const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback) {
+        marker,
+        [this, markerName = handMarker.markerName](const visualization_msgs::msg::InteractiveMarkerFeedback::ConstSharedPtr& feedback) {
           this->processHandInteractiveMarkerFeedback(markerName, feedback);
         });
 
@@ -339,8 +328,7 @@ void HumanoidVisualizer::processHandInteractiveMarkerFeedback(
 
     geometry_msgs::msg::PoseStamped referenceMsg;
     referenceMsg.header.stamp = feedback->header.stamp;
-    referenceMsg.header.frame_id =
-        feedback->header.frame_id.empty() ? handMarker.visualReferenceFrameName : feedback->header.frame_id;
+    referenceMsg.header.frame_id = feedback->header.frame_id.empty() ? handMarker.visualReferenceFrameName : feedback->header.frame_id;
     referenceMsg.pose = handMarker.poseInReferenceFrame;
     handMarker.publisher->publish(referenceMsg);
     break;

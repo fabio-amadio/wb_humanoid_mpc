@@ -1,13 +1,13 @@
 import os
 from glob import glob
-from setuptools import setup
+from setuptools import find_packages, setup
 
 package_name = "remote_control"
 
 setup(
     name=package_name,
     version="0.0.0",
-    packages=[package_name],
+    packages=find_packages(),
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
@@ -23,7 +23,6 @@ setup(
     entry_points={
         "console_scripts": [
             "base_velocity_controller_gui = remote_control.base_velocity_controller_gui:main",
-            "xbox_velocity_publisher = remote_control.xbox_walking_command_publisher:main",
         ],
     },
 )

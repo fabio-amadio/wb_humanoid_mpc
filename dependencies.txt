@@ -14,7 +14,6 @@ libxcursor-dev
 libxi-dev
 ninja-build
 ccache
-python3-pygame
 python3-tk
 black
 

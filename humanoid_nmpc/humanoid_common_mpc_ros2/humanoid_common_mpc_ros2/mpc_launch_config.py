@@ -31,7 +31,6 @@ def extract_constant_from_cpp(file_path, constant_name):
 
 
 class MPCLaunchConfig:
-
     def __init__(
         self,
         mpc_lib_pkg: str,
@@ -58,7 +57,7 @@ class MPCLaunchConfig:
 
         ### MPC Config ###
         default_mpc_config_path = os.path.join(
-            self.mpc_config_pkg_dir, "config/mpc/task.info"
+            self.mpc_config_pkg_dir, "config/mpc/task_locomotion.info"
         )
         default_target_command_path = os.path.join(
             self.mpc_config_pkg_dir, "config/command/reference.info"
@@ -240,7 +239,7 @@ class MPCLaunchConfig:
                 (
                     "/joint_states",
                     TERMINAL_JOINT_STATES_TOPIC,
-                )  # Remap the joint_states topic
+                ),  # Remap the joint_states topic
             ],
         )
 
@@ -269,7 +268,7 @@ class MPCLaunchConfig:
                 (
                     "/joint_states",
                     TARGET_JOINT_STATES_TOPIC,
-                )  # Remap the joint_states topic
+                ),  # Remap the joint_states topic
             ],
         )
 
