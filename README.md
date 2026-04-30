@@ -1,264 +1,251 @@
-# Whole-Body Humanoid MPC
+# G1 Centroidal Dynamics MPC
 
-This repository contains a Whole-Body Nonlinear Model Predictive Controller (NMPC) for humanoid loco-manipulation control. This approach enables to directly optimize through the **full-order torque-level dynamics in realtime** to generate a wide range of humanoid behaviors building up on an [extended & updated version of ocs2](https://github.com/manumerous/ocs2_ros2)
+This repository contains a centroidal-dynamics nonlinear MPC stack for humanoid loco-manipulation on the Unitree G1, built on top of an extended ROS 2 port of OCS2. A concise explanation of the OCS2 centroidal model is available here: [Sleiman et al., A Unified MPC Framework for Whole-Body Dynamic Locomotion and Manipulation](https://arxiv.org/abs/2103.00946).
 
-**Interactive Velocity and Base Height Control via Joystick:**
+This project derives from [`wb_humanoid_mpc`](https://github.com/manumerous/wb_humanoid_mpc) by [Manuel Yves Galliker](https://github.com/manumerous), who established the original software architecture and implementation.
 
-![vokoscreenNG-2025-12-21_20-35-31-ezgif com-optimize](https://github.com/user-attachments/assets/daf374ba-fe82-469d-9270-63d18a51bb53)
+Relative to the original Centroidal Dynamics MPC, this repository adds:
 
+- integration of a hand-pose tracking task
+- integration of a waist-DOF tracking task
+- a motion-reference export pipeline for MPC+RL control with [**YAHMP**](https://github.com/hucebot/yahmp)
 
-It contains the following hardware platform agnostic MPC fromulations:
+## Overview
 
-### Centroidal Dynamics MPC
-The centroidal MPC optimizes over the **whole-body kinematics** and the center off mass dynamics, with a choice to either use a single rigid 
-body model or the full centroidal dynamics. This specific approach builds up on the centroidal model in ocs2 by generalizing costs and constraints to a 6 DoF contact among others. I am still working on documenting this. Until then a conscise explanation of the ocs2 centroidal model can be found here [Sleiman et. al., A Unified MPC Framework for Whole-Body Dynamic Locomotion and Manipulation](https://arxiv.org/abs/2103.00946)
+The centroidal MPC optimizes whole-body kinematics together with centroidal dynamics, with support for locomotion, upper-body posture targets, Cartesian hand references, and downstream MPC motion-reference export.
 
-### Whole-Body Dynamics MPC
-The **whole-body dynamics** MPC optimized over the contact forces and joint accelerations with the option to compute the joint torques for 
-each step planned accross the horizon. I am still working on documenting and publishing the approach. The most relevant information on the choosen approach can currently be found in [Galliker et al., Bipedal Locomotion with Nonlinear Model Predictive Control:
-Online Gait Generation using Whole-Body Dynamics](http://ames.caltech.edu/galliker2022bipedal.pdf)
-### Robot Examples
+The main user-facing workflows in this repo are:
 
-The project supports the following robot examples:
+- dummy simulation with RViz visualization
+- MuJoCo simulation
+- Cartesian hand reference control through RViz interactive markers and ROS topics
+- GUI-based base, height, and waist command input
+- random-motion NPZ motion reference generation
 
-- Unitree G1
-- 1X Neo (Comming soon)
+## Docker Workflow
 
-![Screencast2024-12-16180254-ezgif com-optimize(3)](https://github.com/user-attachments/assets/d4b1f0da-39ca-4ce1-b53c-e1d040abe1be)
+### Build the Docker Image
 
-## Get Started
-
-### Setup Colcon Workspace
-
-Create a colcon workspace and clone the repository into the src folder:
+From the repo root:
 
 ```bash
-mkdir -p humanoid_mpc_ws/src && cd humanoid_mpc_ws/src
-git clone https://github.com/1x-technologies/wb-humanoid-mpc.git
-```
-
-Then initialize all submodules using:
-
-```bash
-cd wb-humanoid-mpc
-git submodule update --init --recursive
-```
-### Install Dependencies
-The project supports both Dockerized workspaces (recommended) or a local installation for developing and running the humanoid MPC. 
-
-<details>
-<summary>Build & run Dockerized workspace in VS Code</summary>
-
-We provide a [Dockerfile](https://github.com/manumerous/wb_humanoid_mpc/blob/main/docker/Dockerfile) to enable running and devloping the project from a containerized environment. Check out the [devcontainer.json](https://github.com/manumerous/wb_humanoid_mpc/blob/main/.devcontainer/devcontainer.json) for the arguments that must be supplied to the `docker build` and `docker run` commands.
-
-For working in **Visual Studio Code**, we recommend to install the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension. Then, with the root of this repository as the root of your VS Code workspace, enter `Ctrl + Shift + P` and select `Dev Containers: Rebuild and Reopen in Container` at the top of the screen. VS Code will then automatically handle calling the `docker build` and `docker run` commands for you and will reopen the window at the root of the containerized workspace. Once this step is completed, you are ready to [build and run the code](https://github.com/manumerous/wb_humanoid_mpc/tree/main?tab=readme-ov-file#building-the-mpc).
-
-</details>
-
-<details>
-<summary> Build & run Dockerized workspace with bash scripts</summary>
-
-This repository includes two helper scripts: `image_build.bash` builds the `wb-humanoid-mpc:dev` Docker image using the arguments defined in `devcontainer.json`. `launch_wb_mpc.bash` starts the Docker container, mounts your workspace, and drops you into a bash shell ready to build and run the WB Humanoid MPC code. Example of building docker image:
-```
-cd /path/to/humanoid_mpc_ws/src/wb_humanoid_mpc/docker
+cd docker
 ./image_build.bash
 ```
-and launching the docker container:
-```
-cd /path/to/humanoid_mpc_ws/src/wb_humanoid_mpc/docker
+
+This builds the `wb-humanoid-mpc:dev` image defined by [docker/Dockerfile](/home/famadio/Workspace/wb_humanoid_mpc/docker/Dockerfile).
+
+### Launch the Container
+
+From the same `docker` directory:
+
+```bash
 ./launch_wb_mpc.bash
 ```
 
-</details>
+This script starts a container named `wb-mpc-dev`, mounts the repository into `/wb_humanoid_mpc_ws/src/wb_humanoid_mpc`, and keeps workspace artifacts on the host in `.docker_ws/`. If the container is already running, re-running the same script opens a new shell inside it with the ROS environment and workspace overlay sourced automatically.
 
-<details>
-<summary>Install Dependencies Locally</summary>
-
-Make sure you have **ros2** installed on your system as e.g specified for Humble in
-the [installation guide](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html).
-
-Then install all dependencies using:
+The container defaults to:
 
 ```bash
-envsubst < dependencies.txt | xargs sudo apt install -y
+RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ```
-</details>
 
+If you inspect ROS 2 topics from another terminal or another container, use the same middleware setting there too.
 
-### Building the MPC 
+## Build Inside Docker
 
-Building the WB MPC consumes a significant amount of RAM. We recommend saving all open work before starting the first build. The RAM usage can be adjusted by setting the PARALLEL_JOBS environment variable. Our recommendation is:
-
-| PARALLEL_JOBS | Required System RAM |
-|--------------:|--------------------:|
-| 2 (default)   |  16 GiB             | 
-| 4             |  32 GiB              |
-| 6             |  64 GiB              | 
-
+Once inside the container:
 
 ```bash
 make build-all
 ```
 
-## Running the examples
-Once you run the NMPC a window with Rviz will appear for visualization. The first time you start the MPC for a certain robot model the auto differentiation code will be generated which might take up to 5-15 min depending on your system. Once done the robot appears and you can control it via an xbox gamepad or the controls in the terminal. 
+The first build can be heavy on RAM, especially when auto-differentiation code is generated for the first time.
 
-On the top level folder run:
-
-For the **Centroidal Dynamics MPC**
-
-```
-make launch-g1-dummy-sim
-```
-
-For the **Whole-Body Dynamics MPC**
-
-```
-make launch-wb-g1-dummy-sim
-```
-
-For the **Centroidal Dynamics MPC with Cartesian hand pose references**
-
-```
-make launch-g1-dummy-sim-hands-cartesian
-```
-
-The hand references are expressed in the `torso_link` frame and can be sent through ROS 2 topics. To send commands while the simulation is running, open another terminal in the same Docker container. If you are using VS Code Dev Containers, open a new integrated terminal.
-
-The RViz config now also includes 6-DoF interactive markers under `Hand Pose Markers`. Dragging or rotating them publishes the same `torso_link`-frame references to `/g1/left_hand_pose_reference` and `/g1/right_hand_pose_reference`.
+`PARALLEL_JOBS=6` is used by default. You can override the build parallelism, for example:
 
 ```bash
- docker exec -it wb-mpc-dev bash
+make PARALLEL_JOBS=2 build-all
 ```
 
-Then source ROS 2 and the workspace in that terminal:
+Recommended RAM by `PARALLEL_JOBS`:
+
+| PARALLEL_JOBS | Required RAM |
+|--------------:|-------------:|
+| 2             | 16 GiB       |
+| 4             | 32 GiB       |
+| 6             | 64 GiB       |
+
+## Run the MPC
+
+There are two main runtime tasks in this repo:
+
+- the **locomotion task**, which controls base velocity, root height, and waist joints. It uses the reduced G1 model with fixed wrist joints
+- the **hand-pose task**, which adds Cartesian hand-pose tracking on top of the locomotion task. It uses the full 29-DOF G1 model
+
+For tuning, start from:
+
+- locomotion MPC task: [task_locomotion.info](/home/famadio/Workspace/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task_locomotion.info)
+- hand-pose MPC task: [task_hand_pose.info](/home/famadio/Workspace/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task_hand_pose.info)
+- runtime reference and command settings: [reference.info](/home/famadio/Workspace/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/command/reference.info)
+
+### Dummy Simulation
+
+Launch the **locomotion task** in the dummy sim. This is a lightweight closed-loop rollout of the centroidal model driven by the current MPC policy, without the MuJoCo physics backend:
 
 ```bash
-source /opt/ros/humble/setup.bash
-source /wb_humanoid_mpc_ws/install/setup.bash
+make launch-g1-dummy-sim-locomotion
 ```
 
-This Docker setup now defaults to Cyclone DDS:
+This expects the base/height/waist command on:
+
+```text
+/humanoid/walking_velocity_command
+```
+
+Launch the **hand-pose task** in the dummy sim:
 
 ```bash
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+make launch-g1-dummy-sim-hand-pose
 ```
 
-If you want to inspect ROS 2 topics from the host or another container, set the same `RMW_IMPLEMENTATION` there as well.
+Besides the base/height/waist command, this expects torso-frame hand pose commands on:
 
-Then send a right hand pose reference:
+```text
+/g1/left_hand_pose_reference
+/g1/right_hand_pose_reference
+```
+
+The first time you launch a given configuration, code generation may take several minutes.
+
+### MuJoCo Simulation
+
+Launch the **locomotion task** in the MuJoCo sim:
 
 ```bash
-ros2 topic pub --once /g1/right_hand_pose_reference geometry_msgs/msg/PoseStamped "{
-  header: {frame_id: 'torso_link'},
-  pose: {
-    position: {x: 0.250, y: -0.150, z: 0.10},
-    orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
-  }
-}"
+make launch-g1-sim-locomotion
 ```
 
-Another example target is:
+Launch the **hand-pose task** in the MuJoCo sim:
 
 ```bash
-ros2 topic pub --once /g1/right_hand_pose_reference geometry_msgs/msg/PoseStamped "{
-  header: {frame_id: 'torso_link'},
-  pose: {
-    position: {x: 0.35, y: -0.200, z: 0.20},
-    orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}
-  }
-}"
+make launch-g1-sim-hand-pose
 ```
 
-You can check the tracked hand pose with:
+## Base/Height/Waist Control
+
+The GUI publishes:
+
+- base linear velocity
+- base yaw rate
+- root height
+- waist yaw, roll, and pitch
+
+It is launched automatically by the standard G1 launch files above.
+
+## Hand Pose Control
+
+The hand-pose launch exposes torso-frame hand references for both hands.
+
+RViz includes interactive markers under `Hand Pose Markers`. Moving them publishes:
+
+- `/g1/left_hand_pose_reference`
+- `/g1/right_hand_pose_reference`
+
+Both are expected in the `torso_link` frame.
+
+## MPC Motion Reference Export
+
+The centroidal MPC can be used to generate motion references for RL-based tracking policies such as [**YAHMP**](https://github.com/hucebot/yahmp).
+
+To publish the motion reference computed by the MPC for downstream consumers:
 
 ```bash
-ros2 run tf2_ros tf2_echo torso_link right_rubber_hand
+make launch-g1-dummy-sim-locomotion-pub-mpc-motion-ref
 ```
 
-To publish MPC references for a downstream RL-based WBC, launch the centroidal dummy sim with:
+or, with the hand-pose task:
 
 ```bash
-make launch-g1-dummy-sim-mpc-motion-reference
+make launch-g1-dummy-sim-hand-pose-pub-mpc-motion-ref
 ```
 
-or, for the Cartesian hands variant:
+This publishes `/g1/mpc_motion_reference`, which contains:
 
-```bash
-make launch-g1-dummy-sim-hands-cartesian-mpc-motion-reference
-```
+- named joint position and velocity references
+- root pose and twist in world
+- a flattened motion-command layout
 
-Both dummy-sim task files enable the same soft foot-separation cost used by the random-reference generator. Tune `foot_separation_cost.weight` or `foot_separation_cost.minLateralSeparation` in `robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task.info` or `task_hands_cartesian.info`, then rebuild/relaunch.
-
-This publishes `/g1/mpc_motion_reference`, containing the named joint position/velocity reference, root pose/twist in world, and the flattened motion command layout:
+The flattened command layout matches the one adopted by [**YAHMP**](https://github.com/hucebot/yahmp):
 
 ```text
 [joint_pos, joint_vel, base_vx_body, base_vy_body, base_yaw_rate_body, base_height, base_roll, base_pitch]
 ```
 
-where:
+### Deployment via HURo
 
-- `joint_pos`: joint position reference in the G1 policy joint order
-- `joint_vel`: joint velocity reference in the same joint order
-- `base_vx_body`: desired base linear velocity along the robot forward axis, expressed in the body frame
-- `base_vy_body`: desired base linear velocity along the robot lateral axis, expressed in the body frame
-- `base_yaw_rate_body`: desired base yaw angular velocity
-- `base_height`: desired base height
-- `base_roll`: desired base roll angle
-- `base_pitch`: desired base pitch angle
+Deployment on the real G1 robot has been tested using [**HURo**](https://github.com/hucebot/huro).
 
-This is already the motion-command structure used downstream by the policy interface; the ROS message additionally carries the named joint/state fields separately for convenience and debugging.
-
-To record this stream as a compatible NPZ for offline policy playback, open a second terminal in the same Docker container and run:
+To communicate with the HURo docker in simulation, use:
 
 ```bash
-ros2 run humanoid_common_mpc_pyutils mpc_motion_reference_recorder \
-  --topic /g1/mpc_motion_reference \
-  --output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/g1_mpc_motion_reference.npz \
-  --duration 10.0
+source setup_uri.sh lo
 ```
 
-The resulting NPZ contains `joint_pos`, `joint_vel`, `body_pos_w`, `body_quat_w`, `body_lin_vel_w`, `body_ang_vel_w`, `body_names`, and `fps`. It will be available on the host at `/home/famadio/Workspace/wb_humanoid_mpc/g1_mpc_motion_reference.npz`.
+Instead, to communicate with the HURo docker and the real robot, use:
 
-To generate a NPZ directly from the centroidal SQP without ROS 2 topics, dummy sim, or visualization, run:
+```bash
+source setup_uri.sh <eth-interface>
+```
+
+where `<eth-interface>` is the name of the ethernet interface used to connect to the robot.
+
+### Random MPC Motion Reference Generation
+
+To generate random motion references and store them directly to NPZ:
 
 ```bash
 make generate-g1-random-mpc-npz
 ```
 
-This writes `/wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz`, visible on the host at `/home/famadio/Workspace/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz`. The generator saves a compressed NPZ and samples smooth random base velocity, pelvis height, yaw-rate, waist joints, and arm joints. For this generator, the wrist joints are kept in the MPC model, so the exported motion includes the full 29-DOF G1 joint set. The default random command ranges are `vx [-0.5, 1.0] m/s`, `vy [-0.5, 0.5] m/s`, `yaw_rate [-0.5, 0.5] rad/s`, and `height [0.4, 0.8] m`. The base command velocity, height, stance, and heading segments are resampled every `3.0` to `9.0` seconds by default. Final `vx`, `vy`, and yaw-rate commands with absolute value below the default `--base-command-deadband 0.1` are snapped to zero. With default probability `0.20`, a command velocity segment is forced to stance with zero linear and angular base velocity. With default probability `0.80`, a command velocity segment uses heading control: a target heading is sampled in `[-pi, pi]`, configurable with `--heading-min` and `--heading-max`, then the yaw-rate command is computed from the wrapped heading error and clamped to the yaw-rate range. The waist targets are clamped to the `[-90, 90] deg` range and resampled every `1.5` to `4.5` seconds; the shoulder and elbow targets are resampled every `2.0` to `6.0` seconds; the wrist targets are resampled every `1.5` to `4.5` seconds. With default probability `0.20`, each waist/arm/wrist segment keeps the previous joint reference instead of drawing a new target; if this happens at `t=0`, it keeps the nominal `defaultJointState`. The random-reference task also enables a soft foot-separation cost that penalizes the left foot getting too close to or crossing over the right foot in the pelvis yaw frame; tune `foot_separation_cost.weight` and `foot_separation_cost.minLateralSeparation` in `task_random_reference.info` if it is too weak or too restrictive. The gait is otherwise selected from the same procedural ladder used by the dummy example: `stance`, `slow_walk`, `walk`, `slower_trot`, `slow_trot`, `trot`, and `run`, using the same velocity thresholds. The gait timings are read from the existing `humanoid_common_mpc/config/command/gait.info`.
+This writes:
 
-To generate several independent motions in one run, pass `--num-motions` through the make target:
+```bash
+/wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz
+```
+
+The generator samples smooth random trajectories for:
+
+- base velocity
+- pelvis height
+- yaw rate
+- waist joints
+- arm joints
+
+This random-generation task uses the full 29-DOF G1 MPC model.
+
+For tuning the random generator, start from:
+
+- random-generation MPC task: [task_random_reference.info](/home/famadio/Workspace/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task_random_reference.info)
+- random-generation reference and command settings: [reference_random_reference.info](/home/famadio/Workspace/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/command/reference_random_reference.info)
+
+#### Batch Generation
+
+To generate multiple motions:
 
 ```bash
 make generate-g1-random-mpc-npz GENERATOR_ARGS="--num-motions 10"
 ```
 
-When `--num-motions` is larger than `1`, the output path is expanded with a numbered suffix, for example `g1_random_mpc_reference_0000.npz`, `g1_random_mpc_reference_0001.npz`, and so on. Each attempt runs in a fresh child process, so a failed rollout or a native crash such as a segmentation fault only discards that attempt instead of killing the full batch. By default each output motion gets up to `20` attempts.
+Each output gets a numbered suffix such as:
 
-For basic locomotion datasets with the upper body fixed, set `--upper-body-fixed-probability 1.0`, disable heading control with `--heading-prob 0.0`, and zero the velocity axes that should not be active. Except for the stance-height example, these commands also pin the base-height reference to the nominal `defaultBaseHeight` with `--height-min 0.7925 --height-max 0.7925`. The following examples keep the command ranges inside the generator defaults:
+- `g1_random_mpc_reference_0000.npz`
+- `g1_random_mpc_reference_0001.npz`
 
-```bash
-make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_forward.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.2 --vx-max 1.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min 0.0 --yaw-rate-max 0.0 --height-min 0.7925 --height-max 0.7925"
+#### Direct Generator Usage
 
-make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_backward.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min -0.5 --vx-max -0.1 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min 0.0 --yaw-rate-max 0.0 --height-min 0.7925 --height-max 0.7925"
-
-make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_left.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.0 --vx-max 0.0 --vy-min 0.1 --vy-max 0.5 --yaw-rate-min 0.0 --yaw-rate-max 0.0 --height-min 0.7925 --height-max 0.7925"
-
-make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_right.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.0 --vx-max 0.0 --vy-min -0.5 --vy-max -0.1 --yaw-rate-min 0.0 --yaw-rate-max 0.0 --height-min 0.7925 --height-max 0.7925"
-
-make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_turn_left.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.0 --vx-max 0.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min 0.2 --yaw-rate-max 0.5 --height-min 0.7925 --height-max 0.7925"
-
-make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_turn_right.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.0 --vx-max 0.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min -0.5 --yaw-rate-max -0.2 --height-min 0.7925 --height-max 0.7925"
-
-make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_stance_height.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 1.0 --vx-min 0.0 --vx-max 0.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min 0.0 --yaw-rate-max 0.0 --height-min 0.4 --height-max 0.8"
-
-make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_forward_turn_left.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.2 --vx-max 1.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min 0.2 --yaw-rate-max 0.5 --height-min 0.7925 --height-max 0.7925"
-
-make generate-g1-random-mpc-npz GENERATOR_ARGS="--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_basic_forward_turn_right.npz --num-motions 10 --upper-body-fixed-probability 1.0 --heading-prob 0.0 --stance-probability 0.0 --vx-min 0.2 --vx-max 1.0 --vy-min 0.0 --vy-max 0.0 --yaw-rate-min -0.5 --yaw-rate-max -0.2 --height-min 0.7925 --height-max 0.7925"
-```
-
-You can also call the generator directly after sourcing the workspace:
+You can also run the generator directly:
 
 ```bash
 ros2 run humanoid_centroidal_mpc_ros2 humanoid_centroidal_mpc_random_reference_generator \
@@ -279,34 +266,12 @@ ros2 run humanoid_centroidal_mpc_ros2 humanoid_centroidal_mpc_random_reference_g
   --upper-body-fixed-probability 0.20
 ```
 
-#### Interactive Robot Control
-Command a desired base velocity and root link height via **Robot Base Controller GUI** and **XBox Controller Joystick**. For the joystick it is easiest to directly connect via USB. Otherwise you need to install the required bluetooth Xbox controller drivers on your linux system. The GUI application automatically scanns for Joysticks and indicates whether one is connected. 
-
-![robot_remote_control](https://github.com/user-attachments/assets/779be1da-97a1-4d0c-8f9b-b9d2df88384f)
-
-
-## Citing Whole-Body Humanoid MPC
-To cite the Whole-Body Humanoid MPC in your academic research, please consider citing the following web BibTeX entry:
-
-```
-@misc{wholebodyhumanoidmpcweb,
-   author = {Manuel Yves Galliker},
-   title = {Whole-body Humanoid MPC: Realtime Physics-Based Procedural Loco-Manipulation Planning and Control},
-   howpublished = {https://github.com/1x-technologies/wb_humanoid_mpc},
-   year = {2024}
-}
-```
-
 ## Acknowledgements
-Created and actively maintained by [Manuel Yves Galliker](https://github.com/manumerous).
 
-Special thanks go to [Nicholas Palermo](https://github.com/nicholaspalomo) for implementing the dockerization among other great inputs and contributions. 
+Special thanks to [Manuel Yves Galliker](https://github.com/manumerous), author of the original [`wb_humanoid_mpc`](https://github.com/manumerous/wb_humanoid_mpc), for the foundational implementation and for open-sourcing this line of work.
 
-This project is founded on the great work of many open-source contributors. I would especially like to acknowledge:
+This project also builds on the work of many open-source contributors, in particular:
+
 - [ocs2](https://github.com/leggedrobotics/ocs2)
 - [pinocchio](https://github.com/stack-of-tasks/pinocchio)
 - [hpipm](https://github.com/giaf/hpipm)
-  
-Part of this work was developed during my time at [1X Technologies](https://www.1x.tech/). I would like to kindly thank Eric Jang and Bernt Børnich for supporting the open sourcing of this project. 
-
-Further I would like to thank Michael Purcell, Jesper Smith, Simon Zimmermann, Joel Filho, Paal Arthur Schjelderup Thorseth, Varit (Ohm) Vichathorn, Sjur Grønnevik Wroldsen, Armin Nurkanovic, Charles Khazoom and Farbod Farshidian for the many fruitful discussions, insights, contributions and support. 

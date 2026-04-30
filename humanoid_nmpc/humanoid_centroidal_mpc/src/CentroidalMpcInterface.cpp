@@ -188,9 +188,9 @@ void CentroidalMpcInterface::setupOptimalControlProblem() {
 
   const auto footSeparationCostConfig = FootSeparationCost::loadConfig(taskFile_, "foot_separation_cost.", verbose_);
   if (footSeparationCostConfig.enabled && footSeparationCostConfig.weight > 0.0) {
-    problemPtr_->costPtr->add("footSeparationCost", std::make_unique<FootSeparationCost>(
-                                                        footSeparationCostConfig, *pinocchioInterfacePtr_, *mpcRobotModelADPtr_,
-                                                        "footSeparationCost", modelSettings_));
+    problemPtr_->costPtr->add("footSeparationCost",
+                              std::make_unique<FootSeparationCost>(footSeparationCostConfig, *pinocchioInterfacePtr_, *mpcRobotModelADPtr_,
+                                                                   "footSeparationCost", modelSettings_));
   }
 
   // Constraints
@@ -361,9 +361,8 @@ void CentroidalMpcInterface::addTaskSpaceKinematicsCosts(
     std::shared_ptr<HandPoseReferenceManager> handPoseReferenceManagerPtr = nullptr;
     std::string handPoseReferenceName;
     if (usePelvisFrameReference) {
-      const auto defaultCostElement =
-          EndEffectorKinematicsQuadraticCost::getReferenceCostElement(initialState_, vector_t::Zero(centroidalModelInfo_.inputDim),
-                                                                      *eeKinematicsPtr);
+      const auto defaultCostElement = EndEffectorKinematicsQuadraticCost::getReferenceCostElement(
+          initialState_, vector_t::Zero(centroidalModelInfo_.inputDim), *eeKinematicsPtr);
       auto& model = pinocchioInterfacePtr_->getModel();
       auto& data = pinocchioInterfacePtr_->getData();
       pinocchio::forwardKinematics(model, data, mpcRobotModelPtr_->getGeneralizedCoordinates(initialState_));
@@ -379,8 +378,8 @@ void CentroidalMpcInterface::addTaskSpaceKinematicsCosts(
       handPoseReferenceManagerPtr = referenceManagerPtr_->getHandPoseReferenceManagerPtr();
       handPoseReferenceName = costName;
       handPoseReferenceManagerPtr->setReference(handPoseReferenceName, defaultReference);
-      std::cout << "Initialized reference-frame pose reference for task `" << handPoseReferenceName << "` in frame `"
-                << referenceFrameName << "`" << std::endl;
+      std::cout << "Initialized reference-frame pose reference for task `" << handPoseReferenceName << "` in frame `" << referenceFrameName
+                << "`" << std::endl;
     }
 
     std::unique_ptr<StateInputCost> cost = std::make_unique<EndEffectorKinematicsQuadraticCost>(

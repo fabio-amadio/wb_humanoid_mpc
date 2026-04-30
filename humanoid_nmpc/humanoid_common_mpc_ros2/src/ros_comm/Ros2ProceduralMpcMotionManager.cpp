@@ -144,7 +144,8 @@ void Ros2ProceduralMpcMotionManager::setHandPoseReference(const std::string& ref
   reference.positionInReferenceFrame = clampHandPosition(referenceName, reference.positionInReferenceFrame);
   reference.orientationReferenceToHand =
       quaternion_t(msg.pose.orientation.w, msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z).normalized();
-  switchedModelReferenceManagerPtr_->getHandPoseReferenceManagerPtr()->setReference(referenceName, reference, handReferenceTransitionDuration_);
+  switchedModelReferenceManagerPtr_->getHandPoseReferenceManagerPtr()->setReference(referenceName, reference,
+                                                                                    handReferenceTransitionDuration_);
 }
 
 vector3_t Ros2ProceduralMpcMotionManager::clampHandPosition(const std::string& referenceName,
@@ -161,8 +162,7 @@ vector3_t Ros2ProceduralMpcMotionManager::clampHandPosition(const std::string& r
   if (!clampedPosition.isApprox(positionInReferenceFrame)) {
     auto logger = rclcpp::get_logger("Ros2ProceduralMpcMotionManager");
     rclcpp::Clock steadyClock(RCL_STEADY_TIME);
-    RCLCPP_WARN_THROTTLE(logger, steadyClock, 1000,
-                         "Clamped %s hand reference from [%.3f %.3f %.3f] to [%.3f %.3f %.3f] in torso frame.",
+    RCLCPP_WARN_THROTTLE(logger, steadyClock, 1000, "Clamped %s hand reference from [%.3f %.3f %.3f] to [%.3f %.3f %.3f] in torso frame.",
                          referenceName.c_str(), positionInReferenceFrame.x(), positionInReferenceFrame.y(), positionInReferenceFrame.z(),
                          clampedPosition.x(), clampedPosition.y(), clampedPosition.z());
   }
@@ -179,8 +179,7 @@ vector3_t Ros2ProceduralMpcMotionManager::clampWaistOrientation(const vector3_t&
   if ((clampedWaistOrientation - desiredWaistOrientation).cwiseAbs().maxCoeff() > kClampTolerance) {
     auto logger = rclcpp::get_logger("Ros2ProceduralMpcMotionManager");
     rclcpp::Clock steadyClock(RCL_STEADY_TIME);
-    RCLCPP_WARN_THROTTLE(logger, steadyClock, 1000,
-                         "Clamped waist reference from [%.1f %.1f %.1f] deg to [%.1f %.1f %.1f] deg.",
+    RCLCPP_WARN_THROTTLE(logger, steadyClock, 1000, "Clamped waist reference from [%.1f %.1f %.1f] deg to [%.1f %.1f %.1f] deg.",
                          desiredWaistOrientation.x() * kRadToDeg, desiredWaistOrientation.y() * kRadToDeg,
                          desiredWaistOrientation.z() * kRadToDeg, clampedWaistOrientation.x() * kRadToDeg,
                          clampedWaistOrientation.y() * kRadToDeg, clampedWaistOrientation.z() * kRadToDeg);

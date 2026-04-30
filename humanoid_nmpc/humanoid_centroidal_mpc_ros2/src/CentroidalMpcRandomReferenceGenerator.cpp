@@ -54,8 +54,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <array>
 #include <cerrno>
 #include <cmath>
-#include <cstdlib>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -70,8 +70,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <utility>
 #include <vector>
 
-#include <Eigen/Geometry>
 #include <zlib.h>
+#include <Eigen/Geometry>
 
 using namespace ocs2;
 using namespace ocs2::humanoid;
@@ -652,11 +652,8 @@ SmoothScalarTrajectory makeRandomSmoothTrajectory(scalar_t duration,
   return trajectory;
 }
 
-StanceSchedule makeRandomStanceSchedule(scalar_t duration,
-                                         scalar_t segmentMin,
-                                         scalar_t segmentMax,
-                                         scalar_t stanceProbability,
-                                         std::mt19937& rng) {
+StanceSchedule makeRandomStanceSchedule(
+    scalar_t duration, scalar_t segmentMin, scalar_t segmentMax, scalar_t stanceProbability, std::mt19937& rng) {
   std::uniform_real_distribution<scalar_t> segmentDist(segmentMin, segmentMax);
   std::bernoulli_distribution stanceDist(std::clamp(stanceProbability, scalar_t(0.0), scalar_t(1.0)));
 
@@ -717,16 +714,12 @@ void throwIfNotFinite(const vector_t& vector, const std::string& name, size_t mo
   }
 }
 
-void throwIfUnexpectedSize(const vector_t& vector,
-                           Eigen::Index expectedSize,
-                           const std::string& name,
-                           size_t motionIndex,
-                           size_t frame,
-                           scalar_t time) {
+void throwIfUnexpectedSize(
+    const vector_t& vector, Eigen::Index expectedSize, const std::string& name, size_t motionIndex, size_t frame, scalar_t time) {
   if (vector.size() != expectedSize) {
     std::ostringstream ss;
-    ss << "Unexpected " << name << " size at motion " << motionIndex << ", frame " << frame << ", t=" << time << ": got "
-       << vector.size() << ", expected " << expectedSize;
+    ss << "Unexpected " << name << " size at motion " << motionIndex << ", frame " << frame << ", t=" << time << ": got " << vector.size()
+       << ", expected " << expectedSize;
     throw std::runtime_error(ss.str());
   }
 }
@@ -859,10 +852,8 @@ void fillFiniteDifferenceBodyVelocities(MotionBuffers& buffers, scalar_t dt) {
 
       const size_t q0 = (t * nBodies + b) * 4;
       const size_t q1 = ((t + 1) * nBodies + b) * 4;
-      Eigen::Quaternion<scalar_t> quat0(buffers.bodyQuat[q0], buffers.bodyQuat[q0 + 1], buffers.bodyQuat[q0 + 2],
-                                        buffers.bodyQuat[q0 + 3]);
-      Eigen::Quaternion<scalar_t> quat1(buffers.bodyQuat[q1], buffers.bodyQuat[q1 + 1], buffers.bodyQuat[q1 + 2],
-                                        buffers.bodyQuat[q1 + 3]);
+      Eigen::Quaternion<scalar_t> quat0(buffers.bodyQuat[q0], buffers.bodyQuat[q0 + 1], buffers.bodyQuat[q0 + 2], buffers.bodyQuat[q0 + 3]);
+      Eigen::Quaternion<scalar_t> quat1(buffers.bodyQuat[q1], buffers.bodyQuat[q1 + 1], buffers.bodyQuat[q1 + 2], buffers.bodyQuat[q1 + 3]);
       quat0.normalize();
       quat1.normalize();
       Eigen::Quaternion<scalar_t> delta = quat1 * quat0.conjugate();
@@ -930,35 +921,29 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
     }
     jointTrajectories.emplace(mpcJointIndex,
                               makeRandomSmoothTrajectory(options.duration, segmentMin, segmentMax, lower, upper,
-                                                         defaultMpcJointState[mpcJointIndex],
-                                                         options.upperBodyFixedProbability, rng));
-    std::cout << "[random_mpc_generator] sampling " << jointName << " in [" << lower << ", " << upper << "] every [" << segmentMin
-              << ", " << segmentMax << "] s\n";
+                                                         defaultMpcJointState[mpcJointIndex], options.upperBodyFixedProbability, rng));
+    std::cout << "[random_mpc_generator] sampling " << jointName << " in [" << lower << ", " << upper << "] every [" << segmentMin << ", "
+              << segmentMax << "] s\n";
   }
 
-  const auto vxTrajectory =
-      makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax, options.vxMin, options.vxMax, 0.0, 0.0,
-                                 rng);
-  const auto vyTrajectory =
-      makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax, options.vyMin, options.vyMax, 0.0, 0.0,
-                                 rng);
+  const auto vxTrajectory = makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax, options.vxMin,
+                                                       options.vxMax, 0.0, 0.0, rng);
+  const auto vyTrajectory = makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax, options.vyMin,
+                                                       options.vyMax, 0.0, 0.0, rng);
   const auto yawRateTrajectory = makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
-                                                           options.yawRateMin, options.yawRateMax, 0.0, 0.0, rng);
+                                                            options.yawRateMin, options.yawRateMax, 0.0, 0.0, rng);
   const auto heightTrajectory = makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
-                                                          options.heightMin, options.heightMax, defaultBaseHeight, 0.0, rng);
-  const auto stanceSchedule = makeRandomStanceSchedule(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
-                                                       options.stanceProbability, rng);
+                                                           options.heightMin, options.heightMax, defaultBaseHeight, 0.0, rng);
+  const auto stanceSchedule =
+      makeRandomStanceSchedule(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax, options.stanceProbability, rng);
   const auto headingSchedule = makeRandomHeadingSchedule(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
                                                          options.headingProbability, options.headingMin, options.headingMax, rng);
 
   const auto gaitMap = getGaitMap(options.gaitFile);
   const std::vector<ProceduralMpcMotionManager::GaitModeStateConfig> gaitModeStates{
-      {"stance", -0.1, 0.1, -0.1, 0.1, 10.0, 10.0},
-      {"slow_walk", 0.05, 0.3, 0.05, 0.2, 0.05, 0.05},
-      {"walk", 0.25, 0.5, 0.15, 0.35, 0.05, 0.05},
-      {"slower_trot", 0.45, 0.7, 0.3, 0.55, 0.1, 0.1},
-      {"slow_trot", 0.65, 0.9, 0.5, 0.7, 0.2, 0.2},
-      {"trot", 0.8, 1.3, 0.65, 10.0, 0.2, 0.2},
+      {"stance", -0.1, 0.1, -0.1, 0.1, 10.0, 10.0}, {"slow_walk", 0.05, 0.3, 0.05, 0.2, 0.05, 0.05},
+      {"walk", 0.25, 0.5, 0.15, 0.35, 0.05, 0.05},  {"slower_trot", 0.45, 0.7, 0.3, 0.55, 0.1, 0.1},
+      {"slow_trot", 0.65, 0.9, 0.5, 0.7, 0.2, 0.2}, {"trot", 0.8, 1.3, 0.65, 10.0, 0.2, 0.2},
       {"run", 1.2, 10.0, 0.65, 10.0, 0.2, 0.2},
   };
   for (const auto& gaitModeState : gaitModeStates) {
@@ -1079,16 +1064,15 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
         currentCfg = gaitModeStates[currentGaitMode];
         currentGaitCommand = currentCfg.gaitCommand;
         lastGaitChangeTime = time;
-        std::cout << "[random_mpc_generator] increasing to gait `" << currentGaitCommand << "` at t=" << std::fixed
-                  << std::setprecision(2) << time << "\n";
-      } else if (currentGaitMode > 0 &&
-                 ProceduralMpcMotionManager::transitionToSlowerGait(filteredVelCommand, baseVelocity, currentCfg)) {
+        std::cout << "[random_mpc_generator] increasing to gait `" << currentGaitCommand << "` at t=" << std::fixed << std::setprecision(2)
+                  << time << "\n";
+      } else if (currentGaitMode > 0 && ProceduralMpcMotionManager::transitionToSlowerGait(filteredVelCommand, baseVelocity, currentCfg)) {
         --currentGaitMode;
         currentCfg = gaitModeStates[currentGaitMode];
         currentGaitCommand = currentCfg.gaitCommand;
         lastGaitChangeTime = time;
-        std::cout << "[random_mpc_generator] decreasing to gait `" << currentGaitCommand << "` at t=" << std::fixed
-                  << std::setprecision(2) << time << "\n";
+        std::cout << "[random_mpc_generator] decreasing to gait `" << currentGaitCommand << "` at t=" << std::fixed << std::setprecision(2)
+                  << time << "\n";
       }
     }
 
@@ -1121,9 +1105,11 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
     observation.input = std::move(nextInput);
     observation.mode = nextMode;
 
-    const vector_t fullJointPos = mpcRobotModel.getFullModelJointAngles(mpcRobotModel.getJointAngles(observation.state), defaultFullJointState);
+    const vector_t fullJointPos =
+        mpcRobotModel.getFullModelJointAngles(mpcRobotModel.getJointAngles(observation.state), defaultFullJointState);
     vector_t fullJointVel = vector_t::Zero(modelSettings.full_joint_dim);
-    fullJointVel = mpcRobotModel.getFullModelJointAngles(mpcRobotModel.getJointVelocities(observation.state, observation.input), fullJointVel);
+    fullJointVel =
+        mpcRobotModel.getFullModelJointAngles(mpcRobotModel.getJointVelocities(observation.state, observation.input), fullJointVel);
 
     appendFullJointState(buffers, fullJointPos, fullJointVel);
     appendBodyPoses(buffers, fullModel, fullData, bodyFrameIds, mpcRobotModel.getBasePose(observation.state), fullJointPos);
@@ -1132,8 +1118,8 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
     ++buffers.numFrames;
 
     if (frame % 25 == 0) {
-      std::cout << "[random_mpc_generator] frame " << frame << "/" << (numFrames - 1) << " time=" << std::fixed
-                << std::setprecision(2) << observation.time << "\n";
+      std::cout << "[random_mpc_generator] frame " << frame << "/" << (numFrames - 1) << " time=" << std::fixed << std::setprecision(2)
+                << observation.time << "\n";
     }
   }
 
@@ -1198,8 +1184,7 @@ int main(int argc, char** argv) {
     const auto outputPath = outputPathForMotion(options.output, motionIndex, options.numMotions);
     bool generated = false;
     for (size_t attemptIndex = 0; attemptIndex < options.maxAttemptsPerMotion; ++attemptIndex) {
-      const uint32_t attemptSeed =
-          options.seed + static_cast<uint32_t>(motionIndex * options.maxAttemptsPerMotion + attemptIndex);
+      const uint32_t attemptSeed = options.seed + static_cast<uint32_t>(motionIndex * options.maxAttemptsPerMotion + attemptIndex);
       const auto temporaryOutputPath = temporaryOutputPathForAttempt(outputPath, attemptIndex);
       std::filesystem::remove(temporaryOutputPath);
 
@@ -1207,8 +1192,8 @@ int main(int argc, char** argv) {
       if (WIFEXITED(attemptStatus) && WEXITSTATUS(attemptStatus) == EXIT_SUCCESS) {
         std::filesystem::remove(outputPath);
         std::filesystem::rename(temporaryOutputPath, outputPath);
-        std::cout << "[random_mpc_generator] motion " << motionIndex << " accepted after attempt " << (attemptIndex + 1)
-                  << "/" << options.maxAttemptsPerMotion << ": " << outputPath.string() << "\n";
+        std::cout << "[random_mpc_generator] motion " << motionIndex << " accepted after attempt " << (attemptIndex + 1) << "/"
+                  << options.maxAttemptsPerMotion << ": " << outputPath.string() << "\n";
         generated = true;
         break;
       } else {

@@ -54,7 +54,7 @@ struct CentroidalTestingModelInterface {
   CentroidalTestingModelInterface() {
     const std::string path(__FILE__);
     const std::string humanoid_centroidal_mpc_install_dir = ament_index_cpp::get_package_share_directory("humanoid_centroidal_mpc");
-    taskFile = humanoid_centroidal_mpc_install_dir + "/config/mpc/task.info";
+    taskFile = humanoid_centroidal_mpc_install_dir + "/config/mpc/task_locomotion.info";
     urdfFile = robot_definitions::URDF_FILE_PATH;
     referenceFile = humanoid_centroidal_mpc_install_dir + "/config/command/reference.info";
 

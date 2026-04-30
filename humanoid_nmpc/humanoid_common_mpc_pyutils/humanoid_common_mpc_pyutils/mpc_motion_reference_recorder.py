@@ -34,10 +34,14 @@ class MpcMotionReferenceRecorder(Node):
             MpcMotionReference, topic, self.reference_callback, qos_profile
         )
 
-        self.get_logger().info(f"Recording MPC motion references from `{topic}` to `{output}`")
+        self.get_logger().info(
+            f"Recording MPC motion references from `{topic}` to `{output}`"
+        )
 
     def reference_callback(self, msg: MpcMotionReference) -> None:
-        timestamp_s = float(msg.header.stamp.sec) + 1.0e-9 * float(msg.header.stamp.nanosec)
+        timestamp_s = float(msg.header.stamp.sec) + 1.0e-9 * float(
+            msg.header.stamp.nanosec
+        )
         if self.start_time_s is None:
             self.start_time_s = timestamp_s
         elapsed_s = timestamp_s - self.start_time_s
@@ -52,12 +56,16 @@ class MpcMotionReferenceRecorder(Node):
         if self.joint_names is None:
             self.joint_names = joint_names
         elif joint_names != self.joint_names:
-            raise RuntimeError("Received MPC motion reference with changed joint_names.")
+            raise RuntimeError(
+                "Received MPC motion reference with changed joint_names."
+            )
 
         joint_pos = np.asarray(msg.joint_pos, dtype=np.float64)
         joint_vel = np.asarray(msg.joint_vel, dtype=np.float64)
         if joint_pos.shape != joint_vel.shape:
-            raise RuntimeError(f"joint_pos shape {joint_pos.shape} does not match joint_vel shape {joint_vel.shape}.")
+            raise RuntimeError(
+                f"joint_pos shape {joint_pos.shape} does not match joint_vel shape {joint_vel.shape}."
+            )
 
         self.timestamps_s.append(elapsed_s)
         self.joint_pos.append(joint_pos)
@@ -106,16 +114,22 @@ class MpcMotionReferenceRecorder(Node):
         self.motion_cmd.append(np.asarray(msg.motion_cmd, dtype=np.float32))
 
         if len(self.timestamps_s) % 100 == 0:
-            self.get_logger().info(f"Recorded {len(self.timestamps_s)} MPC reference frames.")
+            self.get_logger().info(
+                f"Recorded {len(self.timestamps_s)} MPC reference frames."
+            )
 
     def save(self) -> None:
         if not self.timestamps_s:
-            self.get_logger().warn("No MPC motion reference frames were recorded; skipping NPZ save.")
+            self.get_logger().warn(
+                "No MPC motion reference frames were recorded; skipping NPZ save."
+            )
             return
 
         self.output.parent.mkdir(parents=True, exist_ok=True)
         timestamps = np.asarray(self.timestamps_s, dtype=np.float64)
-        fps = 1.0 / float(np.median(np.diff(timestamps))) if timestamps.size > 1 else 0.0
+        fps = (
+            1.0 / float(np.median(np.diff(timestamps))) if timestamps.size > 1 else 0.0
+        )
 
         body_pos_w = np.asarray(self.root_pos_w, dtype=np.float64)[:, None, :]
         body_quat_w = np.asarray(self.root_quat_w, dtype=np.float64)[:, None, :]
@@ -143,8 +157,14 @@ class MpcMotionReferenceRecorder(Node):
 
 
 def _build_argparser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Record `/g1/mpc_motion_reference` to a CLAMP-compatible NPZ.")
-    parser.add_argument("--topic", default="/g1/mpc_motion_reference", help="MPC motion reference topic.")
+    parser = argparse.ArgumentParser(
+        description="Record `/g1/mpc_motion_reference` to a CLAMP-compatible NPZ."
+    )
+    parser.add_argument(
+        "--topic",
+        default="/g1/mpc_motion_reference",
+        help="MPC motion reference topic.",
+    )
     parser.add_argument(
         "--output",
         type=Path,

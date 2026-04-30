@@ -40,10 +40,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <Eigen/Geometry>
 #include <rclcpp/rclcpp.hpp>
 
-#include <humanoid_mpc_msgs/msg/mpc_motion_reference.hpp>
 #include <ocs2_core/misc/LinearInterpolation.h>
 #include <ocs2_robotic_tools/common/RotationTransforms.h>
 #include <ocs2_ros2_interfaces/common/RosMsgConversions.h>
+#include <humanoid_mpc_msgs/msg/mpc_motion_reference.hpp>
 #include <ocs2_ros2_msgs/msg/mpc_observation.hpp>
 
 #include <humanoid_centroidal_mpc/CentroidalMpcInterface.h>
@@ -87,11 +87,8 @@ vector3_t angularVelocityFromBasePoseDifference(const vector6_t& startBasePose, 
 
 class CentroidalMpcMotionReferencePublisher {
  public:
-  CentroidalMpcMotionReferencePublisher(std::string taskFile,
-                                        std::string urdfFile,
-                                        std::string referenceFile,
-                                        std::string topicPrefix,
-                                        rclcpp::Node::SharedPtr nodeHandle)
+  CentroidalMpcMotionReferencePublisher(
+      std::string taskFile, std::string urdfFile, std::string referenceFile, std::string topicPrefix, rclcpp::Node::SharedPtr nodeHandle)
       : interface_(taskFile, urdfFile, referenceFile, false),
         nodeHandle_(std::move(nodeHandle)),
         topicPrefix_(std::move(topicPrefix)),
@@ -125,8 +122,7 @@ class CentroidalMpcMotionReferencePublisher {
     motionReferencePublisher_ = nodeHandle_->create_publisher<humanoid_mpc_msgs::msg::MpcMotionReference>(motionReferenceTopic_, qos);
     policySubscriber_.launchNodes(nodeHandle_, qos);
     observationSubscriber_ = nodeHandle_->create_subscription<ocs2_ros2_msgs::msg::MpcObservation>(
-        observationTopic_, qos,
-        std::bind(&CentroidalMpcMotionReferencePublisher::mpcObservationCallback, this, std::placeholders::_1));
+        observationTopic_, qos, std::bind(&CentroidalMpcMotionReferencePublisher::mpcObservationCallback, this, std::placeholders::_1));
 
     RCLCPP_INFO(nodeHandle_->get_logger(), "Publishing centroidal MPC motion references on %s", motionReferenceTopic_.c_str());
   }
@@ -161,8 +157,8 @@ class CentroidalMpcMotionReferencePublisher {
       return;
     }
 
-    const scalar_t queryTime = std::clamp(observation.time + kPolicyEvaluationLeadTime, policy.timeTrajectory_.front(),
-                                          policy.timeTrajectory_.back());
+    const scalar_t queryTime =
+        std::clamp(observation.time + kPolicyEvaluationLeadTime, policy.timeTrajectory_.front(), policy.timeTrajectory_.back());
     const auto policyState = sampleTrajectory(queryTime, policy.timeTrajectory_, policy.stateTrajectory_);
     const auto policyInput = sampleTrajectory(queryTime, policy.timeTrajectory_, policy.inputTrajectory_);
 

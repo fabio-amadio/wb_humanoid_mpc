@@ -14,6 +14,25 @@ HOST_REPO="$(realpath "${SCRIPT_DIR}/..")"
 HOST_WS_CACHE="${HOST_REPO}/.docker_ws"
 CONTAINER_WS="/wb_humanoid_mpc_ws"
 CONTAINER_REPO="${CONTAINER_WS}/src/wb_humanoid_mpc"
+CONTAINER_NAME="wb-mpc-dev"
+
+# If the container is already running, open a new shell in it with the ROS
+# environment and workspace overlay sourced.
+if docker ps --filter "name=^/${CONTAINER_NAME}$" --format '{{.Names}}' | grep -qx "${CONTAINER_NAME}"; then
+  docker exec -it "${CONTAINER_NAME}" bash -lc "
+    if [ -f /bin/ros_setup.sh ]; then
+      source /bin/ros_setup.sh
+    else
+      source /opt/ros/\${ROS_DISTRO:-humble}/setup.bash
+    fi
+    if [ -f ${CONTAINER_WS}/install/setup.bash ]; then
+      source ${CONTAINER_WS}/install/setup.bash
+    fi
+    cd ${CONTAINER_REPO}
+    exec bash
+  "
+  exit 0
+fi
 
 # Allow GUI applications
 xhost +SI:localuser:root
@@ -33,7 +52,7 @@ mkdir -p "${HOST_WS_CACHE}/src" "${HOST_WS_CACHE}/build" "${HOST_WS_CACHE}/insta
 
 # Run the container, mounting the repo at the expected colcon workspace path
 docker run --rm -it \
-  --name wb-mpc-dev \
+  --name "${CONTAINER_NAME}" \
   --net host \
   --privileged \
   -u root \

@@ -96,7 +96,8 @@ const std::string RobotDescription::getURDFName() const {
 }
 
 std::ostream& operator<<(std::ostream& os, const JointDescription& joint) {
-  os << "JointDescription { " << "id: " << joint.id << ", min_angle: " << joint.min_angle << ", max_angle: " << joint.max_angle
+  os << "JointDescription { "
+     << "id: " << joint.id << ", min_angle: " << joint.min_angle << ", max_angle: " << joint.max_angle
      << ", max_velocity: " << joint.max_velocity << ", max_effort: " << joint.max_effort << " }";
   return os;
 }

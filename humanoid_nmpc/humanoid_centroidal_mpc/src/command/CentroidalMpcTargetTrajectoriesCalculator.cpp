@@ -30,8 +30,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "humanoid_centroidal_mpc/command/CentroidalMpcTargetTrajectoriesCalculator.h"
 
-#include <boost/proto/proto_fwd.hpp>
 #include <algorithm>
+#include <boost/proto/proto_fwd.hpp>
 #include <cmath>
 
 #include <pinocchio/algorithm/center-of-mass.hpp>
@@ -87,9 +87,8 @@ TargetTrajectories CentroidalMpcTargetTrajectoriesCalculator::commandedPositionT
 /******************************************************************************************************/
 /******************************************************************************************************/
 
-TargetTrajectories CentroidalMpcTargetTrajectoriesCalculator::commandedVelocityToTargetTrajectories(const WalkingVelocityCommand& commandedVelocities,
-                                                                                                    scalar_t initTime,
-                                                                                                    const vector_t& initState) {
+TargetTrajectories CentroidalMpcTargetTrajectoriesCalculator::commandedVelocityToTargetTrajectories(
+    const WalkingVelocityCommand& commandedVelocities, scalar_t initTime, const vector_t& initState) {
   // Smoothly transition from the current base motion reference to the commanded one over the first part of the horizon.
 
   vector_t currentPoseTarget = getCurrentBasePoseTarget(initState);

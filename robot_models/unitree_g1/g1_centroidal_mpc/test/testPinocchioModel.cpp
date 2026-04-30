@@ -307,7 +307,7 @@ int main(int argc, char** argv) {
     throw std::runtime_error("Failed to get package share directory: g1_description. Error: " + std::string(e.what()));
   }
 
-  const std::string taskFile = dir + "/../config/mpc/task.info";
+  const std::string taskFile = dir + "/../config/mpc/task_locomotion.info";
 
   std::cout << "urdf filename: " << urdfFile << std::endl;
 

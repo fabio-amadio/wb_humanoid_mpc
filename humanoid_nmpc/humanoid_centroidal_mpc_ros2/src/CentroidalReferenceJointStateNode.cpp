@@ -40,9 +40,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 
+#include <ocs2_core/misc/LinearInterpolation.h>
 #include <ocs2_ros2_interfaces/common/RosMsgConversions.h>
 #include <ocs2_ros2_msgs/msg/mpc_observation.hpp>
-#include <ocs2_core/misc/LinearInterpolation.h>
 
 #include <humanoid_centroidal_mpc/CentroidalMpcInterface.h>
 
@@ -57,11 +57,8 @@ constexpr scalar_t kPolicyEvaluationLeadTime = 0.005;
 
 class CentroidalReferenceJointStatePublisher {
  public:
-  CentroidalReferenceJointStatePublisher(std::string taskFile,
-                                         std::string urdfFile,
-                                         std::string referenceFile,
-                                         std::string topicPrefix,
-                                         rclcpp::Node::SharedPtr nodeHandle)
+  CentroidalReferenceJointStatePublisher(
+      std::string taskFile, std::string urdfFile, std::string referenceFile, std::string topicPrefix, rclcpp::Node::SharedPtr nodeHandle)
       : interface_(taskFile, urdfFile, referenceFile, false),
         nodeHandle_(std::move(nodeHandle)),
         topicPrefix_(std::move(topicPrefix)),
@@ -96,8 +93,7 @@ class CentroidalReferenceJointStatePublisher {
     referenceJointStatePublisher_ = nodeHandle_->create_publisher<sensor_msgs::msg::JointState>(referenceJointStateTopic_, qos);
     policySubscriber_.launchNodes(nodeHandle_, qos);
     observationSubscriber_ = nodeHandle_->create_subscription<ocs2_ros2_msgs::msg::MpcObservation>(
-        observationTopic_, qos,
-        std::bind(&CentroidalReferenceJointStatePublisher::mpcObservationCallback, this, std::placeholders::_1));
+        observationTopic_, qos, std::bind(&CentroidalReferenceJointStatePublisher::mpcObservationCallback, this, std::placeholders::_1));
 
     RCLCPP_INFO(nodeHandle_->get_logger(), "Publishing centroidal references on %s using MPC topics %s and %s",
                 referenceJointStateTopic_.c_str(), observationTopic_.c_str(), (topicPrefix_ + "/mpc_policy").c_str());
@@ -142,8 +138,7 @@ class CentroidalReferenceJointStatePublisher {
     const auto mpcJointVelocities = interface_.getMpcRobotModel().getJointVelocities(policyState, policyInput);
 
     const auto fullJointAngles = expandToFullJointVector(mpcJointAngles, defaultFullJointAngles_);
-    const auto fullJointVelocities = expandToFullJointVector(
-        mpcJointVelocities, vector_t::Zero(interface_.modelSettings().full_joint_dim));
+    const auto fullJointVelocities = expandToFullJointVector(mpcJointVelocities, vector_t::Zero(interface_.modelSettings().full_joint_dim));
 
     sensor_msgs::msg::JointState jointStateMsg;
     jointStateMsg.header.stamp = nodeHandle_->now();

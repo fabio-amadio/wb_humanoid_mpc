@@ -35,8 +35,7 @@ import rclpy
 from rclpy.node import Node
 from humanoid_mpc_msgs.msg import WalkingVelocityCommand
 from rclpy.qos import QoSProfile, ReliabilityPolicy
-from remote_control import XBoxControllerInterface
-from remote_control.tk_app import JoystickGui, LEDIndicatorGui
+from remote_control.tk_app import JoystickGui
 
 DEFAULT_BASE_HEIGHT = 0.7925
 MIN_BASE_HEIGHT = 0.2
@@ -124,7 +123,7 @@ class App(tk.Tk):
         left_frame = ttk.Frame(main_frame)
         left_frame.grid(row=0, column=0, padx=15, pady=15)
 
-        left_label = ttk.Label(left_frame, text="Linear Velocity (LS)")
+        left_label = ttk.Label(left_frame, text="Linear Velocity")
         left_label.pack()
 
         self.joystick_left = JoystickGui(
@@ -136,7 +135,7 @@ class App(tk.Tk):
         right_frame = ttk.Frame(main_frame)
         right_frame.grid(row=0, column=1, padx=15, pady=15)
 
-        right_label = ttk.Label(right_frame, text="Angular Velocity Yaw (RS)")
+        right_label = ttk.Label(right_frame, text="Angular Velocity Yaw")
         right_label.pack()
 
         self.joystick_right = JoystickGui(
@@ -150,7 +149,7 @@ class App(tk.Tk):
         self.slider_frame = ttk.Frame(main_frame)
         self.slider_frame.grid(row=0, column=2, padx=15, pady=10, sticky="ns")
 
-        self.slider_label = ttk.Label(self.slider_frame, text="Root Height (LT + RT)")
+        self.slider_label = ttk.Label(self.slider_frame, text="Root Height")
         self.slider_label.pack(pady=(0, 5))
 
         self.slider = ttk.Scale(
@@ -171,7 +170,9 @@ class App(tk.Tk):
         self.waist_slider_frame.columnconfigure(1, weight=1)
 
         self.waist_yaw_label = ttk.Label(self.waist_slider_frame, text="Waist Yaw")
-        self.waist_yaw_label.grid(row=0, column=0, padx=(0, 12), pady=(0, 5), sticky="w")
+        self.waist_yaw_label.grid(
+            row=0, column=0, padx=(0, 12), pady=(0, 5), sticky="w"
+        )
 
         self.waist_yaw_slider = ttk.Scale(
             self.waist_slider_frame,
@@ -182,11 +183,15 @@ class App(tk.Tk):
             command=self.waist_yaw_slider_callback,
         )
         self.waist_yaw_slider.set(0.0)
-        self.waist_yaw_slider.grid(row=0, column=1, padx=(12, 24), pady=(0, 5), sticky="ew")
+        self.waist_yaw_slider.grid(
+            row=0, column=1, padx=(12, 24), pady=(0, 5), sticky="ew"
+        )
         self.waist_yaw_slider.bind("<ButtonRelease-1>", self.on_waist_slider_release)
 
         self.waist_roll_label = ttk.Label(self.waist_slider_frame, text="Waist Roll")
-        self.waist_roll_label.grid(row=1, column=0, padx=(0, 12), pady=(0, 5), sticky="w")
+        self.waist_roll_label.grid(
+            row=1, column=0, padx=(0, 12), pady=(0, 5), sticky="w"
+        )
 
         self.waist_roll_slider = ttk.Scale(
             self.waist_slider_frame,
@@ -197,7 +202,9 @@ class App(tk.Tk):
             command=self.waist_roll_slider_callback,
         )
         self.waist_roll_slider.set(0.0)
-        self.waist_roll_slider.grid(row=1, column=1, padx=(12, 24), pady=(0, 5), sticky="ew")
+        self.waist_roll_slider.grid(
+            row=1, column=1, padx=(12, 24), pady=(0, 5), sticky="ew"
+        )
         self.waist_roll_slider.bind("<ButtonRelease-1>", self.on_waist_slider_release)
 
         self.waist_pitch_label = ttk.Label(self.waist_slider_frame, text="Waist Pitch")
@@ -218,12 +225,6 @@ class App(tk.Tk):
         # Control frame
         control_frame = ttk.Frame(main_frame)
         control_frame.grid(row=2, column=0, columnspan=3, pady=(10, 0))
-
-        # Create LED
-        self.joystick_connected_indicator = LEDIndicatorGui(
-            control_frame, "Joystick Connection", size=30
-        )
-        self.joystick_connected_indicator.pack(side="left", padx=10)
 
         self.center_button = ttk.Button(
             control_frame, text="Center", command=self.center_all
@@ -255,18 +256,6 @@ class App(tk.Tk):
 
     def waist_pitch_slider_callback(self, value):
         pass
-
-    def set_joystick_connected(self, is_connected):
-        self.joystick_connected_indicator.set_state(is_connected)
-        if is_connected:
-            self.center_button.configure(state="disabled")
-            self.auto_center_checkbox.configure(state="disabled")
-            self.center_button["style"] = "Disabled.TButton"
-
-        else:
-            self.center_button.configure(state="normal")
-            self.auto_center_checkbox.configure(state="normal")
-            self.center_button["style"] = "TButton"
 
     def auto_center_callback(self):
         if self.auto_center_var.get():
@@ -316,10 +305,8 @@ class App(tk.Tk):
 
 class RosJoystickApp(Node):
     def __init__(self):
-        super().__init__("xbox_walking_command_publisher")
-
+        super().__init__("base_velocity_controller_gui")
         self.publisher_rate = 25  # Hz
-        self.xbox_controller_interface = XBoxControllerInterface(self.publisher_rate)
 
         qos_profile = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, depth=25)
 
@@ -334,25 +321,8 @@ class RosJoystickApp(Node):
         self.ros_thread.daemon = True
         self.ros_thread.start()
 
-        self.counter = 0
-
     def timer_callback(self):
-
-        if self.xbox_controller_interface.joystick_connected:
-            success, msg = self.xbox_controller_interface.get_walking_command_msg()
-            if success:
-                self.app.set_knob_positions(msg)
-                self.publisher_.publish(msg)
-                self.app.set_joystick_connected(True)
-
-        else:
-            self.app.set_joystick_connected(False)
-            self.publisher_.publish(self.app.get_walking_command_msg())
-            # check for connection every 2 seconds
-            if self.counter >= (2 * self.publisher_rate):
-                self.xbox_controller_interface.get_joystick_connection()
-                self.counter = 0
-            self.counter = self.counter + 1
+        self.publisher_.publish(self.app.get_walking_command_msg())
 
     def ros_spin(self):
         rclpy.spin(self)

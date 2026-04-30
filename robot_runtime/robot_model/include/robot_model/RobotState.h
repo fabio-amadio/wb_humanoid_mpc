@@ -41,13 +41,15 @@ class RobotState {
   //  Get a vector_t of joint positions given a vector of joint IDs
   template <typename E>
   vector_t getJointPositions(std::vector<E> jointIds, scalar_t defaultValue = std::numeric_limits<scalar_t>::quiet_NaN()) const {
-    return jointStateMap_.toVector(jointIds, [](const JointState& js) { return js.position; }, defaultValue);
+    return jointStateMap_.toVector(
+        jointIds, [](const JointState& js) { return js.position; }, defaultValue);
   }
 
   //  Get a vector_t of joint velocities given a vector of joint IDs
   template <typename E>
   vector_t getJointVelocities(std::vector<E> jointIds, scalar_t defaultValue = std::numeric_limits<scalar_t>::quiet_NaN()) const {
-    return jointStateMap_.toVector(jointIds, [](const JointState& js) { return js.velocity; }, defaultValue);
+    return jointStateMap_.toVector(
+        jointIds, [](const JointState& js) { return js.velocity; }, defaultValue);
   }
 
   bool getContactFlag(size_t index) const { return contactFlags_.at(index); }
