@@ -2,6 +2,14 @@
 
 This repository contains a centroidal-dynamics nonlinear MPC stack for humanoid loco-manipulation on the Unitree G1, built on top of an extended ROS 2 port of OCS2. A concise explanation of the OCS2 centroidal model is available here: [Sleiman et al., A Unified MPC Framework for Whole-Body Dynamic Locomotion and Manipulation](https://arxiv.org/abs/2103.00946).
 
+This project derives from [`wb_humanoid_mpc`](https://github.com/manumerous/wb_humanoid_mpc) by [Manuel Yves Galliker](https://github.com/manumerous), who established the original software architecture and implementation.
+
+Relative to the original Centroidal Dynamics MPC, this repository adds:
+
+- integration of a hand-pose tracking task
+- integration of a waist-DOF tracking task
+- a motion-reference export pipeline for MPC+RL control with [**YAHMP**](https://github.com/hucebot/yahmp)
+
 ## Overview
 
 The centroidal MPC optimizes whole-body kinematics together with centroidal dynamics, with support for locomotion, upper-body posture targets, Cartesian hand references, and downstream MPC motion-reference export.
@@ -260,9 +268,7 @@ ros2 run humanoid_centroidal_mpc_ros2 humanoid_centroidal_mpc_random_reference_g
 
 ## Acknowledgements
 
-This repository is adapted from the original work of [Manuel Yves Galliker](https://github.com/manumerous): [`wb_humanoid_mpc`](https://github.com/manumerous/wb_humanoid_mpc).
-
-Special thanks to Manuel for the original implementation and for open-sourcing this line of work.
+Special thanks to [Manuel Yves Galliker](https://github.com/manumerous), author of the original [`wb_humanoid_mpc`](https://github.com/manumerous/wb_humanoid_mpc), for the foundational implementation and for open-sourcing this line of work.
 
 This project also builds on the work of many open-source contributors, in particular:
 
