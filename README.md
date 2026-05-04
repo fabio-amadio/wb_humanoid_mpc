@@ -175,6 +175,25 @@ The flattened command layout matches the one adopted by [**YAHMP**](https://gith
 [joint_pos, joint_vel, base_vx_body, base_vy_body, base_yaw_rate_body, base_height, base_roll, base_pitch]
 ```
 
+To publish compact motions references with the current step plus future steps:
+
+```bash
+make launch-g1-dummy-sim-locomotion-pub-mpc-future-motion-ref
+```
+
+or, with the hand-pose task:
+
+```bash
+make launch-g1-dummy-sim-hand-pose-pub-mpc-future-motion-ref
+```
+
+This publishes `/g1/mpc_future_motion_reference`, which contains:
+
+- `header`
+- `steps`: YAHMP-Future step offsets, currently `[0, 4, 8, ..., 48]`
+- `dt`: the YAHMP control step, currently `0.02 s`
+- `motion_cmd`: a step-major concatenation of the compact layout above, one block per listed step
+
 ### Deployment via HURo
 
 Deployment on the real G1 robot has been tested using [**HURo**](https://github.com/hucebot/huro).

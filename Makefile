@@ -199,6 +199,12 @@ launch-g1-dummy-sim-locomotion-pub-mpc-motion-ref:
 	source install/setup.bash && \
 	ros2 launch g1_centroidal_mpc dummy_sim.launch.py publish_mpc_motion_reference:=true
 
+launch-g1-dummy-sim-locomotion-pub-mpc-future-motion-ref:
+	cd ${build_dir} && \
+	source ${ros_source_file} && \
+	source install/setup.bash && \
+	ros2 launch g1_centroidal_mpc dummy_sim.launch.py publish_mpc_future_motion_reference:=true
+
 launch-g1-dummy-sim-hand-pose:
 	cd ${build_dir} && \
 	source ${ros_source_file} && \
@@ -210,6 +216,12 @@ launch-g1-dummy-sim-hand-pose-pub-mpc-motion-ref:
 	source ${ros_source_file} && \
 	source install/setup.bash && \
 	ros2 launch g1_centroidal_mpc dummy_sim_hands_cartesian.launch.py publish_mpc_motion_reference:=true
+
+launch-g1-dummy-sim-hand-pose-pub-mpc-future-motion-ref:
+	cd ${build_dir} && \
+	source ${ros_source_file} && \
+	source install/setup.bash && \
+	ros2 launch g1_centroidal_mpc dummy_sim_hands_cartesian.launch.py publish_mpc_future_motion_reference:=true
 
 generate-g1-random-mpc-npz:
 	cd ${build_dir} && \

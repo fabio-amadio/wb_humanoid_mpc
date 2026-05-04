@@ -29,8 +29,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ******************************************************************************/
 
 #include <algorithm>
+#include <array>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -43,6 +45,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ocs2_core/misc/LinearInterpolation.h>
 #include <ocs2_robotic_tools/common/RotationTransforms.h>
 #include <ocs2_ros2_interfaces/common/RosMsgConversions.h>
+#include <humanoid_mpc_msgs/msg/mpc_future_motion_reference.hpp>
 #include <humanoid_mpc_msgs/msg/mpc_motion_reference.hpp>
 #include <ocs2_ros2_msgs/msg/mpc_observation.hpp>
 
@@ -57,6 +60,8 @@ namespace {
 
 constexpr scalar_t kPolicyEvaluationLeadTime = 0.005;
 constexpr scalar_t kVelocityFiniteDifferenceTime = 0.02;
+constexpr scalar_t kYahmpFutureStepDt = 0.02;
+constexpr std::array<int, 13> kYahmpFutureStepOffsets = {0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48};
 
 template <typename Container>
 typename Container::value_type sampleTrajectory(scalar_t time, const scalar_array_t& timeTrajectory, const Container& trajectory) {
@@ -85,15 +90,34 @@ vector3_t angularVelocityFromBasePoseDifference(const vector6_t& startBasePose, 
   return angleAxis.axis() * angleAxis.angle() / duration;
 }
 
+enum class PublishMode {
+  kCurrentMotionReference,
+  kFutureMotionReference,
+};
+
+struct MotionReferenceSample {
+  vector_t fullJointAngles;
+  vector_t fullJointVelocities;
+  vector6_t basePose;
+  Eigen::Quaternion<scalar_t> orientationBaseToWorld;
+  vector3_t rootLinearVelocityWorld;
+  vector3_t rootAngularVelocityWorld;
+  vector3_t rootLinearVelocityBase;
+  vector3_t rootAngularVelocityBase;
+};
+
 class CentroidalMpcMotionReferencePublisher {
  public:
   CentroidalMpcMotionReferencePublisher(
-      std::string taskFile, std::string urdfFile, std::string referenceFile, std::string topicPrefix, rclcpp::Node::SharedPtr nodeHandle)
+      std::string taskFile, std::string urdfFile, std::string referenceFile, std::string topicPrefix, PublishMode publishMode,
+      rclcpp::Node::SharedPtr nodeHandle)
       : interface_(taskFile, urdfFile, referenceFile, false),
         nodeHandle_(std::move(nodeHandle)),
         topicPrefix_(std::move(topicPrefix)),
+        publishMode_(publishMode),
         observationTopic_(topicPrefix_ + "/mpc_observation"),
-        motionReferenceTopic_(topicPrefix_ + "/mpc_motion_reference"),
+        motionReferenceTopic_(publishMode_ == PublishMode::kCurrentMotionReference ? topicPrefix_ + "/mpc_motion_reference"
+                                                                                   : topicPrefix_ + "/mpc_future_motion_reference"),
         policySubscriber_(topicPrefix_) {
     const auto& modelSettings = interface_.modelSettings();
     fullJointNames_ = modelSettings.fullJointNames;
@@ -119,12 +143,19 @@ class CentroidalMpcMotionReferencePublisher {
     auto qos = rclcpp::QoS(10);
     qos.best_effort();
 
-    motionReferencePublisher_ = nodeHandle_->create_publisher<humanoid_mpc_msgs::msg::MpcMotionReference>(motionReferenceTopic_, qos);
+    if (publishMode_ == PublishMode::kCurrentMotionReference) {
+      motionReferencePublisher_ = nodeHandle_->create_publisher<humanoid_mpc_msgs::msg::MpcMotionReference>(motionReferenceTopic_, qos);
+    } else {
+      futureMotionReferencePublisher_ =
+          nodeHandle_->create_publisher<humanoid_mpc_msgs::msg::MpcFutureMotionReference>(motionReferenceTopic_, qos);
+    }
     policySubscriber_.launchNodes(nodeHandle_, qos);
     observationSubscriber_ = nodeHandle_->create_subscription<ocs2_ros2_msgs::msg::MpcObservation>(
         observationTopic_, qos, std::bind(&CentroidalMpcMotionReferencePublisher::mpcObservationCallback, this, std::placeholders::_1));
 
-    RCLCPP_INFO(nodeHandle_->get_logger(), "Publishing centroidal MPC motion references on %s", motionReferenceTopic_.c_str());
+    RCLCPP_INFO(nodeHandle_->get_logger(), "Publishing centroidal MPC %s on %s",
+                publishMode_ == PublishMode::kCurrentMotionReference ? "motion references" : "future motion references",
+                motionReferenceTopic_.c_str());
   }
 
  private:
@@ -165,7 +196,8 @@ class CentroidalMpcMotionReferencePublisher {
     publishReference(policy, queryTime, policyState, policyInput);
   }
 
-  void publishReference(const PrimalSolution& policy, scalar_t queryTime, const vector_t& policyState, const vector_t& policyInput) {
+  MotionReferenceSample sampleMotionReference(const PrimalSolution& policy, scalar_t queryTime, const vector_t& policyState,
+                                              const vector_t& policyInput) const {
     const auto& mpcRobotModel = interface_.getMpcRobotModel();
 
     const auto mpcJointAngles = mpcRobotModel.getJointAngles(policyState);
@@ -198,53 +230,98 @@ class CentroidalMpcMotionReferencePublisher {
     const vector3_t rootLinearVelocityBase = orientationBaseToWorld.inverse() * rootLinearVelocityWorld;
     const vector3_t rootAngularVelocityBase = orientationBaseToWorld.inverse() * rootAngularVelocityWorld;
 
+    return MotionReferenceSample{fullJointAngles, fullJointVelocities, basePose, orientationBaseToWorld, rootLinearVelocityWorld,
+                                 rootAngularVelocityWorld, rootLinearVelocityBase, rootAngularVelocityBase};
+  }
+
+  MotionReferenceSample sampleMotionReference(const PrimalSolution& policy, scalar_t queryTime) const {
+    const scalar_t clampedQueryTime = std::clamp(queryTime, policy.timeTrajectory_.front(), policy.timeTrajectory_.back());
+    const auto policyState = sampleTrajectory(clampedQueryTime, policy.timeTrajectory_, policy.stateTrajectory_);
+    const auto policyInput = sampleTrajectory(clampedQueryTime, policy.timeTrajectory_, policy.inputTrajectory_);
+    return sampleMotionReference(policy, clampedQueryTime, policyState, policyInput);
+  }
+
+  void appendCompactMotionCommand(const MotionReferenceSample& sample, std::vector<float>& motionCmd) const {
+    motionCmd.reserve(motionCmd.size() + 2 * sample.fullJointAngles.size() + 6);
+    for (Eigen::Index i = 0; i < sample.fullJointAngles.size(); ++i) {
+      motionCmd.push_back(static_cast<float>(sample.fullJointAngles[i]));
+    }
+    for (Eigen::Index i = 0; i < sample.fullJointVelocities.size(); ++i) {
+      motionCmd.push_back(static_cast<float>(sample.fullJointVelocities[i]));
+    }
+    motionCmd.push_back(static_cast<float>(sample.rootLinearVelocityBase.x()));
+    motionCmd.push_back(static_cast<float>(sample.rootLinearVelocityBase.y()));
+    motionCmd.push_back(static_cast<float>(sample.rootAngularVelocityBase.z()));
+    motionCmd.push_back(static_cast<float>(sample.basePose[2]));
+    motionCmd.push_back(static_cast<float>(sample.basePose[5]));
+    motionCmd.push_back(static_cast<float>(sample.basePose[4]));
+  }
+
+  void publishCurrentReference(const PrimalSolution& policy, scalar_t queryTime, const vector_t& policyState, const vector_t& policyInput) {
+    const auto sample = sampleMotionReference(policy, queryTime, policyState, policyInput);
+
     humanoid_mpc_msgs::msg::MpcMotionReference referenceMsg;
     referenceMsg.header.stamp = nodeHandle_->now();
     referenceMsg.header.frame_id = "world";
 
     referenceMsg.joint_names = fullJointNames_;
-    referenceMsg.joint_pos.assign(fullJointAngles.data(), fullJointAngles.data() + fullJointAngles.size());
-    referenceMsg.joint_vel.assign(fullJointVelocities.data(), fullJointVelocities.data() + fullJointVelocities.size());
+    referenceMsg.joint_pos.assign(sample.fullJointAngles.data(), sample.fullJointAngles.data() + sample.fullJointAngles.size());
+    referenceMsg.joint_vel.assign(sample.fullJointVelocities.data(), sample.fullJointVelocities.data() + sample.fullJointVelocities.size());
 
-    referenceMsg.root_pose_w.position.x = basePose[0];
-    referenceMsg.root_pose_w.position.y = basePose[1];
-    referenceMsg.root_pose_w.position.z = basePose[2];
-    referenceMsg.root_pose_w.orientation.x = orientationBaseToWorld.x();
-    referenceMsg.root_pose_w.orientation.y = orientationBaseToWorld.y();
-    referenceMsg.root_pose_w.orientation.z = orientationBaseToWorld.z();
-    referenceMsg.root_pose_w.orientation.w = orientationBaseToWorld.w();
+    referenceMsg.root_pose_w.position.x = sample.basePose[0];
+    referenceMsg.root_pose_w.position.y = sample.basePose[1];
+    referenceMsg.root_pose_w.position.z = sample.basePose[2];
+    referenceMsg.root_pose_w.orientation.x = sample.orientationBaseToWorld.x();
+    referenceMsg.root_pose_w.orientation.y = sample.orientationBaseToWorld.y();
+    referenceMsg.root_pose_w.orientation.z = sample.orientationBaseToWorld.z();
+    referenceMsg.root_pose_w.orientation.w = sample.orientationBaseToWorld.w();
 
-    referenceMsg.root_twist_w.linear.x = rootLinearVelocityWorld.x();
-    referenceMsg.root_twist_w.linear.y = rootLinearVelocityWorld.y();
-    referenceMsg.root_twist_w.linear.z = rootLinearVelocityWorld.z();
-    referenceMsg.root_twist_w.angular.x = rootAngularVelocityWorld.x();
-    referenceMsg.root_twist_w.angular.y = rootAngularVelocityWorld.y();
-    referenceMsg.root_twist_w.angular.z = rootAngularVelocityWorld.z();
+    referenceMsg.root_twist_w.linear.x = sample.rootLinearVelocityWorld.x();
+    referenceMsg.root_twist_w.linear.y = sample.rootLinearVelocityWorld.y();
+    referenceMsg.root_twist_w.linear.z = sample.rootLinearVelocityWorld.z();
+    referenceMsg.root_twist_w.angular.x = sample.rootAngularVelocityWorld.x();
+    referenceMsg.root_twist_w.angular.y = sample.rootAngularVelocityWorld.y();
+    referenceMsg.root_twist_w.angular.z = sample.rootAngularVelocityWorld.z();
 
-    referenceMsg.motion_cmd.reserve(2 * fullJointAngles.size() + 6);
-    for (Eigen::Index i = 0; i < fullJointAngles.size(); ++i) {
-      referenceMsg.motion_cmd.push_back(static_cast<float>(fullJointAngles[i]));
-    }
-    for (Eigen::Index i = 0; i < fullJointVelocities.size(); ++i) {
-      referenceMsg.motion_cmd.push_back(static_cast<float>(fullJointVelocities[i]));
-    }
-    referenceMsg.motion_cmd.push_back(static_cast<float>(rootLinearVelocityBase.x()));
-    referenceMsg.motion_cmd.push_back(static_cast<float>(rootLinearVelocityBase.y()));
-    referenceMsg.motion_cmd.push_back(static_cast<float>(rootAngularVelocityBase.z()));
-    referenceMsg.motion_cmd.push_back(static_cast<float>(basePose[2]));
-    referenceMsg.motion_cmd.push_back(static_cast<float>(basePose[5]));
-    referenceMsg.motion_cmd.push_back(static_cast<float>(basePose[4]));
+    appendCompactMotionCommand(sample, referenceMsg.motion_cmd);
 
     motionReferencePublisher_->publish(referenceMsg);
+  }
+
+  void publishFutureReference(const PrimalSolution& policy, scalar_t queryTime) {
+    humanoid_mpc_msgs::msg::MpcFutureMotionReference referenceMsg;
+    referenceMsg.header.stamp = nodeHandle_->now();
+    referenceMsg.header.frame_id = "world";
+    referenceMsg.dt = static_cast<float>(kYahmpFutureStepDt);
+    referenceMsg.steps.assign(kYahmpFutureStepOffsets.begin(), kYahmpFutureStepOffsets.end());
+
+    const size_t perStepMotionCmdDim = 2 * fullJointNames_.size() + 6;
+    referenceMsg.motion_cmd.reserve(referenceMsg.steps.size() * perStepMotionCmdDim);
+    for (const int stepOffset : kYahmpFutureStepOffsets) {
+      const scalar_t sampleTime = queryTime + static_cast<scalar_t>(stepOffset) * kYahmpFutureStepDt;
+      appendCompactMotionCommand(sampleMotionReference(policy, sampleTime), referenceMsg.motion_cmd);
+    }
+
+    futureMotionReferencePublisher_->publish(referenceMsg);
+  }
+
+  void publishReference(const PrimalSolution& policy, scalar_t queryTime, const vector_t& policyState, const vector_t& policyInput) {
+    if (publishMode_ == PublishMode::kCurrentMotionReference) {
+      publishCurrentReference(policy, queryTime, policyState, policyInput);
+      return;
+    }
+    publishFutureReference(policy, queryTime);
   }
 
   CentroidalMpcInterface interface_;
   rclcpp::Node::SharedPtr nodeHandle_;
   std::string topicPrefix_;
+  PublishMode publishMode_;
   std::string observationTopic_;
   std::string motionReferenceTopic_;
   MRTPolicySubscriber policySubscriber_;
   rclcpp::Publisher<humanoid_mpc_msgs::msg::MpcMotionReference>::SharedPtr motionReferencePublisher_;
+  rclcpp::Publisher<humanoid_mpc_msgs::msg::MpcFutureMotionReference>::SharedPtr futureMotionReferencePublisher_;
   rclcpp::Subscription<ocs2_ros2_msgs::msg::MpcObservation>::SharedPtr observationSubscriber_;
 
   std::vector<std::string> fullJointNames_;
@@ -266,11 +343,17 @@ int main(int argc, char** argv) {
   const std::string taskFile(argv[2]);
   const std::string referenceFile(argv[3]);
   const std::string urdfFile(argv[4]);
+  const bool publishFutureMotionReference =
+      std::find(programArgs.begin() + 5, programArgs.end(), "--publish-future-motion-ref") != programArgs.end();
 
   rclcpp::init(argc, argv);
 
-  auto nodeHandle = std::make_shared<rclcpp::Node>(robotName + "_mpc_motion_reference_publisher");
-  CentroidalMpcMotionReferencePublisher referencePublisher(taskFile, urdfFile, referenceFile, robotName, nodeHandle);
+  const std::string nodeName =
+      robotName + (publishFutureMotionReference ? "_mpc_future_motion_reference_publisher" : "_mpc_motion_reference_publisher");
+  auto nodeHandle = std::make_shared<rclcpp::Node>(nodeName);
+  CentroidalMpcMotionReferencePublisher referencePublisher(
+      taskFile, urdfFile, referenceFile, robotName,
+      publishFutureMotionReference ? PublishMode::kFutureMotionReference : PublishMode::kCurrentMotionReference, nodeHandle);
 
   rclcpp::spin(nodeHandle);
   rclcpp::shutdown();
