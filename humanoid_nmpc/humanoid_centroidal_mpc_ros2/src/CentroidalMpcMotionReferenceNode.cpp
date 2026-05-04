@@ -108,9 +108,12 @@ struct MotionReferenceSample {
 
 class CentroidalMpcMotionReferencePublisher {
  public:
-  CentroidalMpcMotionReferencePublisher(
-      std::string taskFile, std::string urdfFile, std::string referenceFile, std::string topicPrefix, PublishMode publishMode,
-      rclcpp::Node::SharedPtr nodeHandle)
+  CentroidalMpcMotionReferencePublisher(std::string taskFile,
+                                        std::string urdfFile,
+                                        std::string referenceFile,
+                                        std::string topicPrefix,
+                                        PublishMode publishMode,
+                                        rclcpp::Node::SharedPtr nodeHandle)
       : interface_(taskFile, urdfFile, referenceFile, false),
         nodeHandle_(std::move(nodeHandle)),
         topicPrefix_(std::move(topicPrefix)),
@@ -196,7 +199,9 @@ class CentroidalMpcMotionReferencePublisher {
     publishReference(policy, queryTime, policyState, policyInput);
   }
 
-  MotionReferenceSample sampleMotionReference(const PrimalSolution& policy, scalar_t queryTime, const vector_t& policyState,
+  MotionReferenceSample sampleMotionReference(const PrimalSolution& policy,
+                                              scalar_t queryTime,
+                                              const vector_t& policyState,
                                               const vector_t& policyInput) const {
     const auto& mpcRobotModel = interface_.getMpcRobotModel();
 
@@ -230,8 +235,9 @@ class CentroidalMpcMotionReferencePublisher {
     const vector3_t rootLinearVelocityBase = orientationBaseToWorld.inverse() * rootLinearVelocityWorld;
     const vector3_t rootAngularVelocityBase = orientationBaseToWorld.inverse() * rootAngularVelocityWorld;
 
-    return MotionReferenceSample{fullJointAngles, fullJointVelocities, basePose, orientationBaseToWorld, rootLinearVelocityWorld,
-                                 rootAngularVelocityWorld, rootLinearVelocityBase, rootAngularVelocityBase};
+    return MotionReferenceSample{fullJointAngles,        fullJointVelocities,     basePose,
+                                 orientationBaseToWorld, rootLinearVelocityWorld, rootAngularVelocityWorld,
+                                 rootLinearVelocityBase, rootAngularVelocityBase};
   }
 
   MotionReferenceSample sampleMotionReference(const PrimalSolution& policy, scalar_t queryTime) const {

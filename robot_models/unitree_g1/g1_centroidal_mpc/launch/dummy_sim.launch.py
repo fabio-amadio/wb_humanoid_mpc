@@ -92,7 +92,9 @@ def generate_launch_description():
             LaunchConfiguration("description_name"),
             "--publish-future-motion-ref",
         ],
-        condition=IfCondition(LaunchConfiguration("publish_mpc_future_motion_reference")),
+        condition=IfCondition(
+            LaunchConfiguration("publish_mpc_future_motion_reference")
+        ),
     )
 
     # Add nodes
