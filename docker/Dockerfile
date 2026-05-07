@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl gnupg2 lsb-release software-properties-common \
     locales \
     git \
+    iproute2 \
     x11-apps \
     mesa-utils \
     gettext-base \
