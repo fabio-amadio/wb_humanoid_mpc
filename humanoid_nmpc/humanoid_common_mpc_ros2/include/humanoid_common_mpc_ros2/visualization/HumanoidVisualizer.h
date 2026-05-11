@@ -85,6 +85,7 @@ class HumanoidVisualizer : public DummyObserver {
                      PinocchioInterface pinocchioInterface,
                      const MpcRobotModelBase<scalar_t>& mpcRobotModel,
                      rclcpp::Node::SharedPtr nodeHandle,
+                     bool enableHandInteractiveMarkers = true,
                      scalar_t maxUpdateFrequency = 60.0);
 
   HumanoidVisualizer(const HumanoidVisualizer&) = delete;

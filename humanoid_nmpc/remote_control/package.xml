@@ -8,9 +8,9 @@
 
   <license>BSD</license>
 
-  <depend>rclcpp</depend>
+  <depend>rclpy</depend>
   <depend>humanoid_mpc_msgs</depend>
-
+  <depend>sensor_msgs</depend>
   <exec_depend>python3-tk</exec_depend>
 
   <export>

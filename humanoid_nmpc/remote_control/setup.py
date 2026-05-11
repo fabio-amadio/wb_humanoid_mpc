@@ -23,6 +23,7 @@ setup(
     entry_points={
         "console_scripts": [
             "base_velocity_controller_gui = remote_control.base_velocity_controller_gui:main",
+            "vive_walking_command_publisher = remote_control.vive_walking_command_publisher:main",
         ],
     },
 )

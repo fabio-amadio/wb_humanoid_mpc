@@ -98,6 +98,7 @@ HumanoidVisualizer::HumanoidVisualizer(const std::string& taskFile,
                                        PinocchioInterface pinocchioInterface,
                                        const MpcRobotModelBase<scalar_t>& mpcRobotModel,
                                        rclcpp::Node::SharedPtr nodeHandle,
+                                       bool enableHandInteractiveMarkers,
                                        scalar_t maxUpdateFrequency)
     : pinocchioInterface_(std::move(pinocchioInterface)),
       mpcRobotModelPtr_(&mpcRobotModel),
@@ -109,7 +110,9 @@ HumanoidVisualizer::HumanoidVisualizer(const std::string& taskFile,
       node_handle_(std::move(nodeHandle)) {
   // launchSubscribers();
   createVisualizationPublishers();
-  initializeHandInteractiveMarkers(taskFile, referenceFile);
+  if (enableHandInteractiveMarkers) {
+    initializeHandInteractiveMarkers(taskFile, referenceFile);
+  }
   prevPolicyState = vector_t::Zero(mpcRobotModelPtr_->getStateDim());
   prevPolicyInput = vector_t::Zero(mpcRobotModelPtr_->getInputDim());
 

@@ -31,8 +31,11 @@ import tkinter as tk
 from tkinter import ttk
 import threading
 import math
+from pathlib import Path
+
 import rclpy
 from rclpy.node import Node
+from ament_index_python.packages import get_package_share_directory
 from humanoid_mpc_msgs.msg import WalkingVelocityCommand
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from remote_control.tk_app import JoystickGui
@@ -44,6 +47,21 @@ WAIST_PITCH_LIMIT_DEG = 28.0
 WAIST_ROLL_LIMIT_DEG = 20.0
 
 
+def load_default_base_height() -> float:
+    try:
+        config_dir = Path(get_package_share_directory("g1_centroidal_mpc"))
+        reference_file = config_dir / "config" / "command" / "reference.info"
+        for line in reference_file.read_text().splitlines():
+            stripped = line.strip()
+            if stripped.startswith("defaultBaseHeight"):
+                tokens = stripped.split()
+                if len(tokens) >= 2:
+                    return float(tokens[1].rstrip(";"))
+    except Exception:
+        pass
+    return DEFAULT_BASE_HEIGHT
+
+
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -51,24 +69,15 @@ class App(tk.Tk):
         self.geometry("900x500")
         self.minsize(900, 500)
 
-        # Set window background color
         self.configure(bg="#2c2c2c")
-
-        # Add padding around the window
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        # Style configuration
-        # Configure modern dark theme styles
         style = ttk.Style()
-
-        # Configure dark theme colors
         style.configure("TFrame", background="#2c2c2c")
         style.configure(
             "TLabel", background="#2c2c2c", foreground="#ffffff", font=("Helvetica", 12)
         )
-
-        # Regular button style
         style.configure(
             "TButton",
             padding=8,
@@ -81,8 +90,6 @@ class App(tk.Tk):
             background=[("active", "#357abd")],
             foreground=[("active", "#ffffff")],
         )
-
-        # Disabled button style
         style.configure(
             "Disabled.TButton",
             padding=8,
@@ -90,16 +97,12 @@ class App(tk.Tk):
             foreground="#888888",
             font=("Helvetica", 10, "bold"),
         )
-
-        # Modern checkbox style
         style.configure(
             "TCheckbutton",
             background="#2c2c2c",
             foreground="#ffffff",
             font=("Helvetica", 10),
         )
-
-        # Modern scale (slider) style
         style.configure(
             "Vertical.TScale",
             background="#2c2c2c",
@@ -115,43 +118,33 @@ class App(tk.Tk):
 
         self.auto_center_var = tk.BooleanVar(value=False)
 
-        # Main container frame
         main_frame = ttk.Frame(self)
         main_frame.pack(padx=15, pady=15, fill="both", expand=True)
 
-        # Left Joystick (Linear Velocity)
         left_frame = ttk.Frame(main_frame)
         left_frame.grid(row=0, column=0, padx=15, pady=15)
-
         left_label = ttk.Label(left_frame, text="Linear Velocity")
         left_label.pack()
-
         self.joystick_left = JoystickGui(
             left_frame, auto_center_var=self.auto_center_var, fix_y_axis=False
         )
         self.joystick_left.pack(pady=(5, 5))
 
-        # Right Joystick (Angular Velocity Yaw)
         right_frame = ttk.Frame(main_frame)
         right_frame.grid(row=0, column=1, padx=15, pady=15)
-
         right_label = ttk.Label(right_frame, text="Angular Velocity Yaw")
         right_label.pack()
-
         self.joystick_right = JoystickGui(
             right_frame, auto_center_var=self.auto_center_var, fix_y_axis=True
         )
         self.joystick_right.pack(pady=(5, 5))
 
-        # Slider frame
         self.min_base_height = MIN_BASE_HEIGHT
         self.max_base_height = DEFAULT_BASE_HEIGHT
         self.slider_frame = ttk.Frame(main_frame)
         self.slider_frame.grid(row=0, column=2, padx=15, pady=10, sticky="ns")
-
         self.slider_label = ttk.Label(self.slider_frame, text="Root Height")
         self.slider_label.pack(pady=(0, 5))
-
         self.slider = ttk.Scale(
             self.slider_frame,
             from_=self.max_base_height,
@@ -173,7 +166,6 @@ class App(tk.Tk):
         self.waist_yaw_label.grid(
             row=0, column=0, padx=(0, 12), pady=(0, 5), sticky="w"
         )
-
         self.waist_yaw_slider = ttk.Scale(
             self.waist_slider_frame,
             from_=-WAIST_YAW_LIMIT_DEG,
@@ -192,7 +184,6 @@ class App(tk.Tk):
         self.waist_roll_label.grid(
             row=1, column=0, padx=(0, 12), pady=(0, 5), sticky="w"
         )
-
         self.waist_roll_slider = ttk.Scale(
             self.waist_slider_frame,
             from_=-WAIST_ROLL_LIMIT_DEG,
@@ -209,7 +200,6 @@ class App(tk.Tk):
 
         self.waist_pitch_label = ttk.Label(self.waist_slider_frame, text="Waist Pitch")
         self.waist_pitch_label.grid(row=2, column=0, padx=(0, 12), sticky="w")
-
         self.waist_pitch_slider = ttk.Scale(
             self.waist_slider_frame,
             from_=-WAIST_PITCH_LIMIT_DEG,
@@ -222,15 +212,12 @@ class App(tk.Tk):
         self.waist_pitch_slider.grid(row=2, column=1, padx=(12, 24), sticky="ew")
         self.waist_pitch_slider.bind("<ButtonRelease-1>", self.on_waist_slider_release)
 
-        # Control frame
         control_frame = ttk.Frame(main_frame)
         control_frame.grid(row=2, column=0, columnspan=3, pady=(10, 0))
-
         self.center_button = ttk.Button(
             control_frame, text="Center", command=self.center_all
         )
         self.center_button.pack(side="left", padx=10)
-
         self.auto_center_checkbox = ttk.Checkbutton(
             control_frame,
             text="Auto Center",
@@ -289,11 +276,9 @@ class App(tk.Tk):
 
     def get_walking_command_msg(self):
         msg = WalkingVelocityCommand()
-
         msg.linear_velocity_x = self.joystick_left.x_norm
         msg.linear_velocity_y = self.joystick_left.y_norm
         msg.angular_velocity_z = self.joystick_right.y_norm
-
         msg.desired_pelvis_height = min(
             max(self.slider.get(), self.min_base_height), self.max_base_height
         )
@@ -306,17 +291,13 @@ class App(tk.Tk):
 class RosJoystickApp(Node):
     def __init__(self):
         super().__init__("base_velocity_controller_gui")
-        self.publisher_rate = 25  # Hz
-
+        self.publisher_rate = 25
         qos_profile = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, depth=25)
-
         self.publisher_ = self.create_publisher(
             WalkingVelocityCommand, "/humanoid/walking_velocity_command", qos_profile
         )
         self.timer = self.create_timer(1 / self.publisher_rate, self.timer_callback)
-
         self.app = App()
-
         self.ros_thread = threading.Thread(target=self.ros_spin)
         self.ros_thread.daemon = True
         self.ros_thread.start()
@@ -336,6 +317,8 @@ class RosJoystickApp(Node):
 
 
 def main():
+    global DEFAULT_BASE_HEIGHT
+    DEFAULT_BASE_HEIGHT = load_default_base_height()
     rclpy.init()
     app = RosJoystickApp()
     app.run()

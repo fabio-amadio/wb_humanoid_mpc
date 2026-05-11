@@ -66,12 +66,14 @@ int main(int argc, char** argv) {
 
   // Launch MPC ROS node
   rclcpp::Node::SharedPtr nodeHandle = std::make_shared<rclcpp::Node>(robotName + "_centroidal_mpc");
+  const bool enableHandInteractiveMarkers = nodeHandle->declare_parameter("enable_hand_interactive_markers", true);
 
   auto qos = rclcpp::QoS(1);
   qos.best_effort();
 
   std::shared_ptr<HumanoidVisualizer> humanoidVisualizer(
-      new HumanoidVisualizer(taskFile, referenceFile, interface.getPinocchioInterface(), interface.getMpcRobotModel(), nodeHandle));
+      new HumanoidVisualizer(taskFile, referenceFile, interface.getPinocchioInterface(), interface.getMpcRobotModel(), nodeHandle,
+                             enableHandInteractiveMarkers));
 
   // Reference and motion management for Procedural MPC
   CentroidalMpcTargetTrajectoriesCalculator mpcTargetTrajectoriesCalculator(

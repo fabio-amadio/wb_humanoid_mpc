@@ -211,6 +211,18 @@ launch-g1-dummy-sim-hand-pose:
 	source install/setup.bash && \
 	ros2 launch g1_centroidal_mpc dummy_sim_hands_cartesian.launch.py
 
+launch-g1-dummy-sim-teleop:
+	cd ${build_dir} && \
+	source ${ros_source_file} && \
+	source install/setup.bash && \
+	ros2 launch g1_centroidal_mpc dummy_sim_hands_cartesian.launch.py enable_hand_interactive_markers:=false enable_gui_control:=false enable_vive_walking_command_publisher:=true
+
+launch-g1-dummy-sim-teleop-pub-mpc-motion-ref:
+	cd ${build_dir} && \
+	source ${ros_source_file} && \
+	source install/setup.bash && \
+	ros2 launch g1_centroidal_mpc dummy_sim_hands_cartesian.launch.py enable_hand_interactive_markers:=false enable_gui_control:=false enable_vive_walking_command_publisher:=true publish_mpc_motion_reference:=true
+
 launch-g1-dummy-sim-hand-pose-pub-mpc-motion-ref:
 	cd ${build_dir} && \
 	source ${ros_source_file} && \

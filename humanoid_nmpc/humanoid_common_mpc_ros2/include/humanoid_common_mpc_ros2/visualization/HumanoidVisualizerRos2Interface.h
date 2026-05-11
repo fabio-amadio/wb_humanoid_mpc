@@ -45,6 +45,7 @@ class HumanoidVisualizerRos2Interface : public HumanoidVisualizer {
                                   PinocchioInterface pinocchioInterface,
                                   const MpcRobotModelBase<scalar_t>& mpcRobotModel,
                                   rclcpp::Node::SharedPtr nodeHandle,
+                                  bool enableHandInteractiveMarkers = true,
                                   scalar_t maxUpdateFrequency = 100.0);
 
   HumanoidVisualizerRos2Interface(const HumanoidVisualizerRos2Interface&) = delete;

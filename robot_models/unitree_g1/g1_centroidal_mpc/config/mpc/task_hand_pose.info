@@ -286,7 +286,7 @@ Q_final
   ;; Base Pose: [position, orientation] ;;
   (6,6)   0.0    ; p_base_x
   (7,7)   0.0    ; p_base_y
-  (8,8)   20.0    ; p_base_z
+  (8,8)   15.0    ; p_base_z
   ; euler angles for base to world rotation
   (9,9)   0.0    ; theta_base_z
   (10,10) 5.0    ; theta_base_y
@@ -392,12 +392,12 @@ task_space_costs
     pelvis_frame_pose_reference true
     reference_frame_link_name torso_link
     weights {
-      pos_x               400.0
-      pos_y               400.0
-      pos_z               400.0
-      orientation_x       400.0
-      orientation_y       400.0
-      orientation_z       400.0
+      pos_x               200.0
+      pos_y               200.0
+      pos_z               200.0
+      orientation_x       200.0
+      orientation_y       200.0
+      orientation_z       200.0
       lin_velocity_x      0.5
       lin_velocity_y      0.5
       lin_velocity_z      0.5
@@ -418,12 +418,12 @@ task_space_costs
     pelvis_frame_pose_reference true
     reference_frame_link_name torso_link
     weights {
-      pos_x               400.0
-      pos_y               400.0
-      pos_z               400.0
-      orientation_x       400.0
-      orientation_y       400.0
-      orientation_z       400.0
+      pos_x               200.0
+      pos_y               200.0
+      pos_z               200.0
+      orientation_x       200.0
+      orientation_y       200.0
+      orientation_z       200.0
       lin_velocity_x      0.5
       lin_velocity_y      0.5
       lin_velocity_z      0.5

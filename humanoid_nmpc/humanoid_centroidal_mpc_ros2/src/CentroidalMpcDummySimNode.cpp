@@ -64,13 +64,15 @@ int main(int argc, char** argv) {
 
   // MRT
   rclcpp::Node::SharedPtr nodeHandle = std::make_shared<rclcpp::Node>(robotName + "_mrt");
+  const bool enableHandInteractiveMarkers = nodeHandle->declare_parameter("enable_hand_interactive_markers", true);
 
   MRT_ROS_Interface mrt(robotName);
   mrt.initRollout(&interface.getRollout());
   mrt.launchNodes(nodeHandle, qos);
 
   std::shared_ptr<HumanoidVisualizer> humanoidVisualizer(
-      new HumanoidVisualizer(taskFile, referenceFile, interface.getPinocchioInterface(), interface.getMpcRobotModel(), nodeHandle));
+      new HumanoidVisualizer(taskFile, referenceFile, interface.getPinocchioInterface(), interface.getMpcRobotModel(), nodeHandle,
+                             enableHandInteractiveMarkers));
 
   // Dummy legged robot
   MRT_ROS_Dummy_Loop dummySimulator(mrt, 100, interface.mpcSettings().mpcDesiredFrequency_);

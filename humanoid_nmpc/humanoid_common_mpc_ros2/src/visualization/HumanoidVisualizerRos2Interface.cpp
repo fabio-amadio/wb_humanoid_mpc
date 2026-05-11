@@ -43,8 +43,10 @@ HumanoidVisualizerRos2Interface::HumanoidVisualizerRos2Interface(const std::stri
                                                                  PinocchioInterface pinocchioInterface,
                                                                  const MpcRobotModelBase<scalar_t>& mpcRobotModel,
                                                                  rclcpp::Node::SharedPtr nodeHandle,
+                                                                 bool enableHandInteractiveMarkers,
                                                                  scalar_t maxUpdateFrequency)
-    : HumanoidVisualizer(taskFile, referenceFile, pinocchioInterface, mpcRobotModel, nodeHandle, maxUpdateFrequency),
+    : HumanoidVisualizer(taskFile, referenceFile, pinocchioInterface, mpcRobotModel, nodeHandle,
+                         enableHandInteractiveMarkers, maxUpdateFrequency),
       mRTPolicySubscriper_("humanoid") {}
 
 /******************************************************************************************************/

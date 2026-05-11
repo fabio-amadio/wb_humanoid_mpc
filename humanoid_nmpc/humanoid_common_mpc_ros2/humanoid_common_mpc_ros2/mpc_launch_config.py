@@ -5,7 +5,9 @@ from ament_index_python.packages import get_package_share_directory
 import launch_ros
 import launch
 from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
 from launch.substitutions import Command, LaunchConfiguration
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 ROBOT_DESCRIPTION_TOPIC = "/mpc/robot_description"
@@ -94,6 +96,14 @@ class MPCLaunchConfig:
             executable=mpc_sim_exec,
             prefix=self.terminal_prefix,
             name=mpc_sim_exec,
+            parameters=[
+                {
+                    "enable_hand_interactive_markers": ParameterValue(
+                        LaunchConfiguration("enable_hand_interactive_markers"),
+                        value_type=bool,
+                    )
+                }
+            ],
             arguments=[
                 LaunchConfiguration("robot_name"),
                 LaunchConfiguration("config_name"),
@@ -125,6 +135,14 @@ class MPCLaunchConfig:
             executable=dummy_sim_node_exec,
             prefix=self.terminal_prefix,
             name=dummy_sim_node_exec,
+            parameters=[
+                {
+                    "enable_hand_interactive_markers": ParameterValue(
+                        LaunchConfiguration("enable_hand_interactive_markers"),
+                        value_type=bool,
+                    )
+                }
+            ],
             arguments=[
                 LaunchConfiguration("robot_name"),
                 LaunchConfiguration("config_name"),
@@ -277,6 +295,17 @@ class MPCLaunchConfig:
             executable="base_velocity_controller_gui",
             name="base_velocity_controller_gui",
             output="screen",
+            condition=IfCondition(LaunchConfiguration("enable_gui_control")),
+        )
+
+        self.vive_walking_command_publisher_node = launch_ros.actions.Node(
+            package="remote_control",
+            executable="vive_walking_command_publisher",
+            name="vive_walking_command_publisher",
+            output="screen",
+            condition=IfCondition(
+                LaunchConfiguration("enable_vive_walking_command_publisher")
+            ),
         )
 
         self.mpc_observation_logger_node = launch_ros.actions.Node(
@@ -321,10 +350,25 @@ class MPCLaunchConfig:
             default_value=self.xml_path,
             description="Path to Mujoco xml file",
         )
+        self.declare_enable_gui_control = DeclareLaunchArgument(
+            "enable_gui_control",
+            default_value="true",
+            description="Launch the GUI walking command publisher.",
+        )
+        self.declare_enable_vive_walking_command_publisher = DeclareLaunchArgument(
+            "enable_vive_walking_command_publisher",
+            default_value="false",
+            description="Launch the Vive joint-state walking command publisher.",
+        )
         self.declare_rviz_config_path = DeclareLaunchArgument(
             "rvizconfig",
             default_value=default_rviz_config_path,
             description="Absolute path to rviz config file",
+        )
+        self.declare_enable_hand_interactive_markers = DeclareLaunchArgument(
+            "enable_hand_interactive_markers",
+            default_value="true",
+            description="Enable RViz hand interactive markers when the task supports hand pose references.",
         )
 
         print("Finished launch config initialization")

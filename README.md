@@ -19,7 +19,7 @@ The main user-facing workflows in this repo are:
 - dummy simulation with RViz visualization
 - MuJoCo simulation
 - Cartesian hand reference control through RViz interactive markers and ROS topics
-- GUI-based base, height, and waist command input
+- Vive-based locomotion command input
 - random-motion NPZ motion reference generation
 
 ## Docker Workflow
@@ -109,6 +109,18 @@ Besides the base/height/waist command, this expects torso-frame hand pose comman
 /g1/right_hand_pose_reference
 ```
 
+If you want the same hand-pose topics available for an external teleop source without the RViz interactive markers, use:
+
+```bash
+make launch-g1-dummy-sim-teleop
+```
+
+To use that teleop setup while also publishing `/g1/mpc_motion_reference` for the RL policy, use:
+
+```bash
+make launch-g1-dummy-sim-teleop-pub-mpc-motion-ref
+```
+
 The first time you launch a given configuration, code generation may take several minutes.
 
 ### MuJoCo Simulation
@@ -125,16 +137,19 @@ Launch the **hand-pose task** in the MuJoCo sim:
 make launch-g1-sim-hand-pose
 ```
 
-## Base/Height/Waist Control
+## Vive Locomotion Control
 
-The GUI publishes:
+The teleop node subscribes to:
 
-- base linear velocity
-- base yaw rate
-- root height
-- waist yaw, roll, and pitch
+- `/vive/right/joint_states`
+- `/vive/left/joint_states`
 
-It is launched automatically by the standard G1 launch files above.
+It is launched by the teleop launch variants and publishes `/humanoid/walking_velocity_command`.
+
+The mapping is:
+
+- from `/vive/right/joint_states`: `trackpad_x` and `trackpad_y` control linear velocity `x/y` only when `trackpad_pressed == 1`
+- from `/vive/left/joint_states`: `trackpad_y` controls yaw velocity only when `trackpad_pressed == 1`
 
 ## Hand Pose Control
 

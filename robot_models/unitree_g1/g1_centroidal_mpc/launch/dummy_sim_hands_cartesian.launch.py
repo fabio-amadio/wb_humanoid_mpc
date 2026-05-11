@@ -34,6 +34,9 @@ def generate_launch_description():
     cfg.ld.add_action(cfg.declare_gait_command_file)
     cfg.ld.add_action(cfg.declare_urdf_path)
     cfg.ld.add_action(cfg.declare_rviz_config_path)
+    cfg.ld.add_action(cfg.declare_enable_hand_interactive_markers)
+    cfg.ld.add_action(cfg.declare_enable_gui_control)
+    cfg.ld.add_action(cfg.declare_enable_vive_walking_command_publisher)
     cfg.ld.add_action(
         DeclareLaunchArgument(
             "publish_mpc_motion_reference",
@@ -90,5 +93,6 @@ def generate_launch_description():
     cfg.ld.add_action(cfg.target_robot_state_publisher_node)
     cfg.ld.add_action(cfg.rviz_node)
     cfg.ld.add_action(cfg.base_velocity_controller_gui_node)
+    cfg.ld.add_action(cfg.vive_walking_command_publisher_node)
 
     return cfg.ld
