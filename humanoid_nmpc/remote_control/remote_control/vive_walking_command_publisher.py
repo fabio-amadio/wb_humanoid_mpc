@@ -61,7 +61,17 @@ def _joint_value(msg: JointState, joint_name: str) -> float | None:
     return None
 
 
+def _joint_value_any(msg: JointState, joint_names: tuple[str, ...]) -> float | None:
+    for joint_name in joint_names:
+        value = _joint_value(msg, joint_name)
+        if value is not None:
+            return value
+    return None
+
+
 class ViveWalkingCommandPublisher(Node):
+    GRIP_JOINT_NAMES = ("grip_button", "grip_pressed", "grip")
+
     def __init__(self):
         super().__init__("vive_walking_command_publisher")
 
@@ -74,6 +84,13 @@ class ViveWalkingCommandPublisher(Node):
         ).value
         self.trackpad_deadband = self.declare_parameter(
             "trackpad_deadband", 0.1
+        ).value
+        self.waist_yaw_rate = self.declare_parameter("waist_yaw_rate", 0.8).value
+        self.waist_yaw_min = self.declare_parameter(
+            "waist_yaw_min", -1.57079632679
+        ).value
+        self.waist_yaw_max = self.declare_parameter(
+            "waist_yaw_max", 1.57079632679
         ).value
 
         qos_profile = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, depth=25)
@@ -97,10 +114,14 @@ class ViveWalkingCommandPublisher(Node):
 
         self.left_trackpad = TrackpadCommand()
         self.right_trackpad = TrackpadCommand()
+        self.left_grip_pressed = False
+        self.right_grip_pressed = False
+        self.waist_yaw_reference = 0.0
 
     def left_callback(self, msg: JointState):
         trackpad_x = _joint_value(msg, "trackpad_x")
         trackpad_pressed = _joint_value(msg, "trackpad_pressed")
+        grip_pressed = _joint_value_any(msg, self.GRIP_JOINT_NAMES)
 
         if trackpad_x is None or trackpad_pressed is None:
             self.get_logger().warn(
@@ -111,11 +132,15 @@ class ViveWalkingCommandPublisher(Node):
 
         self.left_trackpad.x = float(trackpad_x)
         self.left_trackpad.pressed = float(trackpad_pressed) >= self.pressed_threshold
+        self.left_grip_pressed = (
+            grip_pressed is not None and float(grip_pressed) >= self.pressed_threshold
+        )
 
     def right_callback(self, msg: JointState):
         trackpad_x = _joint_value(msg, "trackpad_x")
         trackpad_y = _joint_value(msg, "trackpad_y")
         trackpad_pressed = _joint_value(msg, "trackpad_pressed")
+        grip_pressed = _joint_value_any(msg, self.GRIP_JOINT_NAMES)
 
         if trackpad_x is None or trackpad_y is None or trackpad_pressed is None:
             self.get_logger().warn(
@@ -128,6 +153,9 @@ class ViveWalkingCommandPublisher(Node):
         self.right_trackpad.y = float(trackpad_y)
         self.right_trackpad.pressed = (
             float(trackpad_pressed) >= self.pressed_threshold
+        )
+        self.right_grip_pressed = (
+            grip_pressed is not None and float(grip_pressed) >= self.pressed_threshold
         )
 
     def timer_callback(self):
@@ -152,11 +180,23 @@ class ViveWalkingCommandPublisher(Node):
             msg.angular_velocity_z = 0.0
 
         msg.desired_pelvis_height = self.default_base_height
-        msg.desired_waist_yaw = 0.0
+        self.update_waist_yaw_reference()
+        msg.desired_waist_yaw = self.waist_yaw_reference
         msg.desired_waist_roll = 0.0
         msg.desired_waist_pitch = 0.0
 
         self.publisher_.publish(msg)
+
+    def update_waist_yaw_reference(self):
+        command_direction = float(self.left_grip_pressed) - float(
+            self.right_grip_pressed
+        )
+        self.waist_yaw_reference += (
+            command_direction * self.waist_yaw_rate / self.publisher_rate
+        )
+        self.waist_yaw_reference = max(
+            self.waist_yaw_min, min(self.waist_yaw_reference, self.waist_yaw_max)
+        )
 
 
 def main(args=None):
