@@ -47,6 +47,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <humanoid_common_mpc/cost/StateInputQuadraticCost.h>
 #include <humanoid_common_mpc/pinocchio_model/pinocchioUtils.h>
 #include "humanoid_common_mpc/constraint/ContactMomentXYConstraintCppAd.h"
+#include "humanoid_common_mpc/constraint/BaseHeightSoftConstraint.h"
 #include "humanoid_common_mpc/constraint/FootCollisionConstraint.h"
 #include "humanoid_common_mpc/constraint/JointLimitsSoftConstraint.h"
 #include "humanoid_common_mpc/cost/ExternalTorqueQuadraticCostAD.h"
@@ -147,6 +148,31 @@ std::unique_ptr<StateCost> HumanoidCostConstraintFactory::getJointLimitsConstrai
   std::pair<vector_t, vector_t> jointLimits = readPinocchioJointLimits(*pinocchioInterfacePtr_, mpcRobotModelPtr_->modelSettings);
 
   return std::unique_ptr<StateCost>(new JointLimitsSoftConstraint(jointLimits, barrierPenaltyConfig, *mpcRobotModelPtr_));
+}
+
+/******************************************************************************************************/
+/******************************************************************************************************/
+/******************************************************************************************************/
+
+std::unique_ptr<StateCost> HumanoidCostConstraintFactory::getBaseHeightConstraint() const {
+  boost::property_tree::ptree pt;
+  boost::property_tree::read_info(taskFile_, pt);
+  const std::string prefix = "baseHeightConstraint.";
+
+  bool active = false;
+  scalar_t maxHeight = 0.0;
+  PieceWisePolynomialBarrierPenalty::Config barrierPenaltyConfig;
+
+  loadData::loadPtreeValue(pt, active, prefix + "active", verbose_);
+  if (!active) {
+    return nullptr;
+  }
+
+  loadData::loadPtreeValue(pt, maxHeight, prefix + "maxHeight", verbose_);
+  loadData::loadPtreeValue(pt, barrierPenaltyConfig.mu, prefix + "mu", verbose_);
+  loadData::loadPtreeValue(pt, barrierPenaltyConfig.delta, prefix + "delta", verbose_);
+
+  return std::unique_ptr<StateCost>(new BaseHeightSoftConstraint(maxHeight, barrierPenaltyConfig, *mpcRobotModelPtr_));
 }
 
 /******************************************************************************************************/

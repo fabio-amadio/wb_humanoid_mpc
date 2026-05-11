@@ -67,7 +67,7 @@ class ViveWalkingCommandPublisher(Node):
 
         self.publisher_rate = self.declare_parameter("publisher_rate", 25.0).value
         self.default_base_height = self.declare_parameter(
-            "default_base_height", 0.7925
+            "default_base_height", 0.75
         ).value
         self.pressed_threshold = self.declare_parameter(
             "pressed_threshold", 0.5

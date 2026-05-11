@@ -127,7 +127,7 @@ initialState
   ;; Base Pose: [position, orientation] ;;
   (6,0)  0.0     ; p_base_x
   (7,0)  0.0     ; p_base_y
-  (8,0)  0.7925     ; p_base_z
+  (8,0)  0.75     ; p_base_z
   (9,0)  0.0     ; theta_base_z
   (10,0) 0.0     ; theta_base_y
   (11,0) 0.0     ; theta_base_x
@@ -527,6 +527,14 @@ jointLimits
     ; relaxed log barrier parameters
     mu                     1200.0
     delta                  0.1   
+}
+
+baseHeightConstraint
+{
+    active                 true
+    maxHeight              0.76
+    mu                     4000.0
+    delta                  0.01
 }
 
 collision_constraint
