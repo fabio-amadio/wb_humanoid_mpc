@@ -30,6 +30,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "humanoid_common_mpc/cost/EndEffectorKinematicsQuadraticCost.h"
 
+#include <algorithm>
+#include <cmath>
 #include <utility>
 
 #include <ocs2_robotic_tools/common/RotationTransforms.h>
@@ -51,6 +53,34 @@ EndEffectorKinematicsQuadraticCost::EndEffectorKinematicsQuadraticCost(
     std::shared_ptr<HandPoseReferenceManager> handPoseReferenceManagerPtr,
     std::string handPoseReferenceName,
     std::string referenceFrameName)
+    : EndEffectorKinematicsQuadraticCost(std::move(weights),
+                                         pinocchioInterface,
+                                         endEffectorKinematics,
+                                         mpcRobotModel,
+                                         mpcRobotModelAD,
+                                         std::move(endEffectorName),
+                                         modelSettings,
+                                         std::move(handPoseReferenceManagerPtr),
+                                         std::move(handPoseReferenceName),
+                                         std::move(referenceFrameName),
+                                         WalkingGainSchedule{}) {}
+
+/******************************************************************************************************/
+/******************************************************************************************************/
+/******************************************************************************************************/
+
+EndEffectorKinematicsQuadraticCost::EndEffectorKinematicsQuadraticCost(
+    EndEffectorKinematicsWeights weights,
+    const PinocchioInterface& pinocchioInterface,
+    const EndEffectorKinematics<scalar_t>& endEffectorKinematics,
+    const MpcRobotModelBase<scalar_t>& mpcRobotModel,
+    const MpcRobotModelBase<ad_scalar_t>& mpcRobotModelAD,
+    std::string endEffectorName,
+    const ModelSettings& modelSettings,
+    std::shared_ptr<HandPoseReferenceManager> handPoseReferenceManagerPtr,
+    std::string handPoseReferenceName,
+    std::string referenceFrameName,
+    WalkingGainSchedule walkingGainSchedule)
     : StateInputCostGaussNewtonAd(),
       sqrtWeights_(weights.toVector().cwiseSqrt()),
       pinocchioInterface_(pinocchioInterface),
@@ -60,7 +90,8 @@ EndEffectorKinematicsQuadraticCost::EndEffectorKinematicsQuadraticCost(
       mpcRobotModelADPtr(mpcRobotModelAD.clone()),
       handPoseReferenceManagerPtr_(std::move(handPoseReferenceManagerPtr)),
       handPoseReferenceName_(std::move(handPoseReferenceName)),
-      referenceFrameName_(std::move(referenceFrameName)) {
+      referenceFrameName_(std::move(referenceFrameName)),
+      walkingGainSchedule_(walkingGainSchedule) {
   std::cout << "Initialized EndEffectorKinematicsQuadraticCost with weights: " << weights.toVector().transpose() << std::endl;
   std::cout << "Frame name: " << endEffectorName << std::endl;
   frameID_ = pinocchioInterface.getModel().getFrameId(endEffectorName);
@@ -94,7 +125,8 @@ EndEffectorKinematicsQuadraticCost::EndEffectorKinematicsQuadraticCost(const End
       mpcRobotModelADPtr(other.mpcRobotModelADPtr->clone()),
       handPoseReferenceManagerPtr_(other.handPoseReferenceManagerPtr_),
       handPoseReferenceName_(other.handPoseReferenceName_),
-      referenceFrameName_(other.referenceFrameName_) {}
+      referenceFrameName_(other.referenceFrameName_),
+      walkingGainSchedule_(other.walkingGainSchedule_) {}
 
 /******************************************************************************************************/
 /******************************************************************************************************/
@@ -110,10 +142,11 @@ vector_t EndEffectorKinematicsQuadraticCost::getParameters(scalar_t time,
   const auto handPoseReference =
       handPoseReferenceManagerPtr_ != nullptr ? handPoseReferenceManagerPtr_->getReference(handPoseReferenceName_, time) : std::nullopt;
   vector_t parameters(n_parameters_);
+  const vector12_t scheduledSqrtWeights = sqrtWeights_ * std::sqrt(getWalkingGainScale(xRef));
   parameters << (handPoseReference.has_value() ? getExternalReferenceCostElement(xRef, uRef, *handPoseReference)
                                                : getReferenceCostElement(xRef, uRef, *endEffectorKinematicsPtr_))
                     .getValues(),
-      sqrtWeights_;
+      scheduledSqrtWeights;
   return parameters;
 }
 
@@ -129,6 +162,28 @@ EndEffectorKinematicsCostElement<scalar_t> EndEffectorKinematicsQuadraticCost::g
   costElement.setLinearVelocity(endEffectorKinematics.getVelocity(state, input)[0]);
   costElement.setAngularVelocity(endEffectorKinematics.getAngularVelocity(state, input)[0]);
   return costElement;
+}
+
+/******************************************************************************************************/
+/******************************************************************************************************/
+/******************************************************************************************************/
+
+scalar_t EndEffectorKinematicsQuadraticCost::getWalkingGainScale(const vector_t& xRef) const {
+  if (!walkingGainSchedule_.active) {
+    return 1.0;
+  }
+
+  const scalar_t speed = xRef.head<2>().norm();
+  const scalar_t threshold = std::max<scalar_t>(walkingGainSchedule_.speedThreshold, 0.0);
+  const scalar_t fullScaleSpeed = std::max<scalar_t>(walkingGainSchedule_.fullScaleSpeed, threshold);
+  const scalar_t clampedGainScale = std::clamp(walkingGainSchedule_.gainScale, scalar_t(0.0), scalar_t(1.0));
+
+  if (fullScaleSpeed <= threshold + 1e-9) {
+    return speed > threshold ? clampedGainScale : 1.0;
+  }
+
+  const scalar_t alpha = std::clamp((speed - threshold) / (fullScaleSpeed - threshold), scalar_t(0.0), scalar_t(1.0));
+  return (1.0 - alpha) + alpha * clampedGainScale;
 }
 
 /******************************************************************************************************/

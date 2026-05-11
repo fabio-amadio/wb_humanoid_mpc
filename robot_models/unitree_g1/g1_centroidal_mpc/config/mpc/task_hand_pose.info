@@ -391,6 +391,9 @@ task_space_costs
     link_name     left_rubber_hand
     pelvis_frame_pose_reference true
     reference_frame_link_name torso_link
+    walkingGainScale           0.25
+    walkingSpeedThreshold      0.05
+    walkingSpeedFullScale      0.20
     weights {
       pos_x               200.0
       pos_y               200.0
@@ -417,6 +420,9 @@ task_space_costs
     link_name     right_rubber_hand
     pelvis_frame_pose_reference true
     reference_frame_link_name torso_link
+    walkingGainScale           0.25
+    walkingSpeedThreshold      0.05
+    walkingSpeedFullScale      0.20
     weights {
       pos_x               200.0
       pos_y               200.0

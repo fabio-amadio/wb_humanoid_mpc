@@ -353,6 +353,19 @@ void CentroidalMpcInterface::addTaskSpaceKinematicsCosts(
 
     EndEffectorKinematicsWeights weights =
         EndEffectorKinematicsWeights::getWeights(taskFile_, "task_space_costs." + costName + ".weights.", verbose_);
+    EndEffectorKinematicsQuadraticCost::WalkingGainSchedule walkingGainSchedule;
+    if (const auto gainScale = task_space_costs_pt.get_optional<scalar_t>(costName + ".walkingGainScale")) {
+      walkingGainSchedule.active = true;
+      walkingGainSchedule.gainScale = *gainScale;
+    }
+    if (const auto speedThreshold = task_space_costs_pt.get_optional<scalar_t>(costName + ".walkingSpeedThreshold")) {
+      walkingGainSchedule.active = true;
+      walkingGainSchedule.speedThreshold = *speedThreshold;
+    }
+    if (const auto fullScaleSpeed = task_space_costs_pt.get_optional<scalar_t>(costName + ".walkingSpeedFullScale")) {
+      walkingGainSchedule.active = true;
+      walkingGainSchedule.fullScaleSpeed = *fullScaleSpeed;
+    }
 
     bool usePelvisFrameReference = false;
     loadData::loadPtreeValue(task_space_costs_pt, usePelvisFrameReference, costName + ".pelvis_frame_pose_reference", verbose_);
@@ -390,7 +403,7 @@ void CentroidalMpcInterface::addTaskSpaceKinematicsCosts(
 
     std::unique_ptr<StateInputCost> cost = std::make_unique<EndEffectorKinematicsQuadraticCost>(
         weights, *pinocchioInterfacePtr_, *eeKinematicsPtr, *mpcRobotModelPtr_, *mpcRobotModelADPtr_, linkName, modelSettings_,
-        handPoseReferenceManagerPtr, handPoseReferenceName, referenceFrameName);
+        handPoseReferenceManagerPtr, handPoseReferenceName, referenceFrameName, walkingGainSchedule);
 
     problemPtr_->costPtr->add(costName + "_TaskSpaceKinematicsCost", std::move(cost));
 

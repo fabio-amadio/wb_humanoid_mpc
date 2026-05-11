@@ -49,6 +49,13 @@ namespace ocs2::humanoid {
 
 class EndEffectorKinematicsQuadraticCost : public ocs2::StateInputCostGaussNewtonAd {
  public:
+  struct WalkingGainSchedule {
+    bool active = false;
+    scalar_t gainScale = 1.0;
+    scalar_t speedThreshold = 0.05;
+    scalar_t fullScaleSpeed = 0.35;
+  };
+
   EndEffectorKinematicsQuadraticCost(EndEffectorKinematicsWeights weights,
                                      const PinocchioInterface& pinocchioInterface,
                                      const EndEffectorKinematics<scalar_t>& endEffectorKinematics,
@@ -59,6 +66,18 @@ class EndEffectorKinematicsQuadraticCost : public ocs2::StateInputCostGaussNewto
                                      std::shared_ptr<HandPoseReferenceManager> handPoseReferenceManagerPtr = nullptr,
                                      std::string handPoseReferenceName = "",
                                      std::string referenceFrameName = "");
+
+  EndEffectorKinematicsQuadraticCost(EndEffectorKinematicsWeights weights,
+                                     const PinocchioInterface& pinocchioInterface,
+                                     const EndEffectorKinematics<scalar_t>& endEffectorKinematics,
+                                     const MpcRobotModelBase<scalar_t>& mpcRobotModel,
+                                     const MpcRobotModelBase<ad_scalar_t>& mpcRobotModelAD,
+                                     std::string endEffectorName,
+                                     const ModelSettings& modelSettings,
+                                     std::shared_ptr<HandPoseReferenceManager> handPoseReferenceManagerPtr,
+                                     std::string handPoseReferenceName,
+                                     std::string referenceFrameName,
+                                     WalkingGainSchedule walkingGainSchedule);
 
   ~EndEffectorKinematicsQuadraticCost() override = default;
   EndEffectorKinematicsQuadraticCost* clone() const override { return new EndEffectorKinematicsQuadraticCost(*this); }
@@ -86,6 +105,7 @@ class EndEffectorKinematicsQuadraticCost : public ocs2::StateInputCostGaussNewto
   EndEffectorKinematicsCostElement<scalar_t> getExternalReferenceCostElement(const vector_t& state,
                                                                              const vector_t& input,
                                                                              const HandPoseReference& referenceFrameReference) const;
+  scalar_t getWalkingGainScale(const vector_t& xRef) const;
 
   ad_vector_t costVectorFunction(ad_scalar_t time,
                                  const ad_vector_t& state,
@@ -104,6 +124,7 @@ class EndEffectorKinematicsQuadraticCost : public ocs2::StateInputCostGaussNewto
   std::shared_ptr<HandPoseReferenceManager> handPoseReferenceManagerPtr_;
   std::string handPoseReferenceName_;
   std::string referenceFrameName_;
+  WalkingGainSchedule walkingGainSchedule_;
   bool isActive_ = true;
 };
 
