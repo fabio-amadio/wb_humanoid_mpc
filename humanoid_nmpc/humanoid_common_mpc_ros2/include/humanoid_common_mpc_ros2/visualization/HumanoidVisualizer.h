@@ -55,6 +55,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "humanoid_common_mpc/common/MpcRobotModelBase.h"
 #include "humanoid_common_mpc/common/Types.h"
+#include "humanoid_common_mpc/constraint/ArmBodyCollisionConstraint.h"
 #include "humanoid_common_mpc/constraint/FootCollisionConstraint.h"
 #include "humanoid_common_mpc_ros2/visualization/EquivalentContactCornerForcesVisualizer.h"
 
@@ -175,6 +176,7 @@ class HumanoidVisualizer : public DummyObserver {
   vector_t prevPolicyInput;
 
   FootCollisionConstraint::Config collisionConfig_;
+  ArmBodyCollisionConstraint::Config armBodyCollisionConfig_;
   std::unique_ptr<interactive_markers::InteractiveMarkerServer> handInteractiveMarkerServerPtr_{};
   std::vector<HandInteractiveMarker> handInteractiveMarkers_;
   mutable std::mutex handInteractiveMarkersMutex_;

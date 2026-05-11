@@ -117,6 +117,7 @@ HumanoidVisualizer::HumanoidVisualizer(const std::string& taskFile,
   prevPolicyInput = vector_t::Zero(mpcRobotModelPtr_->getInputDim());
 
   collisionConfig_ = FootCollisionConstraint::loadFootCollisionConstraintConfig(taskFile);
+  armBodyCollisionConfig_ = ArmBodyCollisionConstraint::loadConfig(taskFile, "collision_constraint.arm_body.");
 }
 
 /******************************************************************************************************/
@@ -472,16 +473,41 @@ void HumanoidVisualizer::publishSelfCollisionMarkers(const contact_flag_t& conta
                                                   collisionConfig_.leftFootFrame2,      collisionConfig_.rightFootFrame2,
                                                   collisionConfig_.leftKneeFrame,       collisionConfig_.rightKneeFrame};
 
-  // Reserve message
-  const size_t numberOfCollisionMarkers = collisionFrameNames.size();
-  visualization_msgs::msg::MarkerArray markerArray;
-  markerArray.markers.reserve(numberOfCollisionMarkers);
-
   std::vector<scalar_t> collisionSphereRadius = {collisionConfig_.footCollisionSphereRadius, collisionConfig_.footCollisionSphereRadius,
                                                  collisionConfig_.footCollisionSphereRadius, collisionConfig_.footCollisionSphereRadius,
                                                  collisionConfig_.footCollisionSphereRadius, collisionConfig_.footCollisionSphereRadius,
                                                  collisionConfig_.footCollisionSphereRadius, collisionConfig_.footCollisionSphereRadius,
                                                  collisionConfig_.kneeCollisionSphereRadius, collisionConfig_.kneeCollisionSphereRadius};
+
+  if (armBodyCollisionConfig_.active) {
+    collisionFrameNames.push_back(armBodyCollisionConfig_.leftElbowFrame);
+    collisionFrameNames.push_back(armBodyCollisionConfig_.rightElbowFrame);
+    collisionFrameNames.push_back(armBodyCollisionConfig_.leftForearmFrame);
+    collisionFrameNames.push_back(armBodyCollisionConfig_.rightForearmFrame);
+    collisionFrameNames.push_back(armBodyCollisionConfig_.leftHandFrame);
+    collisionFrameNames.push_back(armBodyCollisionConfig_.rightHandFrame);
+    collisionFrameNames.push_back(armBodyCollisionConfig_.leftUpperLegFrame);
+    collisionFrameNames.push_back(armBodyCollisionConfig_.rightUpperLegFrame);
+    collisionFrameNames.push_back(armBodyCollisionConfig_.leftLowerLegFrame);
+    collisionFrameNames.push_back(armBodyCollisionConfig_.rightLowerLegFrame);
+    collisionFrameNames.push_back(armBodyCollisionConfig_.torsoFrame);
+    collisionSphereRadius.push_back(armBodyCollisionConfig_.elbowSphereRadius);
+    collisionSphereRadius.push_back(armBodyCollisionConfig_.elbowSphereRadius);
+    collisionSphereRadius.push_back(armBodyCollisionConfig_.forearmSphereRadius);
+    collisionSphereRadius.push_back(armBodyCollisionConfig_.forearmSphereRadius);
+    collisionSphereRadius.push_back(armBodyCollisionConfig_.handSphereRadius);
+    collisionSphereRadius.push_back(armBodyCollisionConfig_.handSphereRadius);
+    collisionSphereRadius.push_back(armBodyCollisionConfig_.upperLegSphereRadius);
+    collisionSphereRadius.push_back(armBodyCollisionConfig_.upperLegSphereRadius);
+    collisionSphereRadius.push_back(armBodyCollisionConfig_.lowerLegSphereRadius);
+    collisionSphereRadius.push_back(armBodyCollisionConfig_.lowerLegSphereRadius);
+    collisionSphereRadius.push_back(armBodyCollisionConfig_.torsoSphereRadius);
+  }
+
+  // Reserve message
+  const size_t numberOfCollisionMarkers = collisionFrameNames.size();
+  visualization_msgs::msg::MarkerArray markerArray;
+  markerArray.markers.reserve(numberOfCollisionMarkers);
 
   std::vector<vector3_t> collisionPositions = getFramePositions<scalar_t>(pinocchioInterface_, collisionFrameNames);
 

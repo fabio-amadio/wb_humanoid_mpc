@@ -47,6 +47,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <humanoid_common_mpc/cost/StateInputQuadraticCost.h>
 #include <humanoid_common_mpc/pinocchio_model/pinocchioUtils.h>
 #include "humanoid_common_mpc/constraint/ContactMomentXYConstraintCppAd.h"
+#include "humanoid_common_mpc/constraint/ArmBodyCollisionConstraint.h"
 #include "humanoid_common_mpc/constraint/BaseHeightSoftConstraint.h"
 #include "humanoid_common_mpc/constraint/FootCollisionConstraint.h"
 #include "humanoid_common_mpc/constraint/JointLimitsSoftConstraint.h"
@@ -173,6 +174,31 @@ std::unique_ptr<StateCost> HumanoidCostConstraintFactory::getBaseHeightConstrain
   loadData::loadPtreeValue(pt, barrierPenaltyConfig.delta, prefix + "delta", verbose_);
 
   return std::unique_ptr<StateCost>(new BaseHeightSoftConstraint(maxHeight, barrierPenaltyConfig, *mpcRobotModelPtr_));
+}
+
+/******************************************************************************************************/
+/******************************************************************************************************/
+/******************************************************************************************************/
+
+std::unique_ptr<StateCost> HumanoidCostConstraintFactory::getArmBodyCollisionConstraint() const {
+  const std::string prefix = "collision_constraint.arm_body.";
+
+  const ArmBodyCollisionConstraint::Config config = ArmBodyCollisionConstraint::loadConfig(taskFile_, prefix, verbose_);
+  if (!config.active) {
+    return nullptr;
+  }
+
+  boost::property_tree::ptree pt;
+  boost::property_tree::read_info(taskFile_, pt);
+  PieceWisePolynomialBarrierPenalty::Config barrierPenaltyConfig;
+  loadData::loadPtreeValue(pt, barrierPenaltyConfig.mu, prefix + "mu", verbose_);
+  loadData::loadPtreeValue(pt, barrierPenaltyConfig.delta, prefix + "delta", verbose_);
+
+  std::unique_ptr<ArmBodyCollisionConstraint> armBodyCollisionConstraintPtr(new ArmBodyCollisionConstraint(
+      *pinocchioInterfacePtr_, *mpcRobotModelADPtr_, config, "ArmBodyCollisionConstraint_v4", modelSettings_));
+  std::unique_ptr<PieceWisePolynomialBarrierPenalty> penalty(new PieceWisePolynomialBarrierPenalty(barrierPenaltyConfig));
+
+  return std::unique_ptr<StateCost>(new StateSoftConstraint(std::move(armBodyCollisionConstraintPtr), std::move(penalty)));
 }
 
 /******************************************************************************************************/

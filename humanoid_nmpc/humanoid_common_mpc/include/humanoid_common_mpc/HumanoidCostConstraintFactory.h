@@ -73,6 +73,8 @@ class HumanoidCostConstraintFactory {
 
   std::unique_ptr<StateCost> getBaseHeightConstraint() const;
 
+  std::unique_ptr<StateCost> getArmBodyCollisionConstraint() const;
+
   std::unique_ptr<StateInputCost> getContactMomentXYConstraint(size_t contactPointIndex, const std::string& name) const;
 
   std::unique_ptr<StateInputConstraint> getZeroWrenchConstraint(size_t contactPointIndex) const;

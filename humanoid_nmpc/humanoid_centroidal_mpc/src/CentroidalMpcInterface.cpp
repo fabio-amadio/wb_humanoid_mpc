@@ -198,6 +198,9 @@ void CentroidalMpcInterface::setupOptimalControlProblem() {
   if (auto baseHeightConstraint = factory.getBaseHeightConstraint()) {
     problemPtr_->stateSoftConstraintPtr->add("baseHeightSoftConstraint", std::move(baseHeightConstraint));
   }
+  if (auto armBodyCollisionConstraint = factory.getArmBodyCollisionConstraint()) {
+    problemPtr_->stateSoftConstraintPtr->add("ArmBodyCollisionSoftConstraint", std::move(armBodyCollisionConstraint));
+  }
   problemPtr_->stateSoftConstraintPtr->add("FootCollisionSoftConstraint", factory.getFootCollisionConstraint());
 
   // Constraint terms

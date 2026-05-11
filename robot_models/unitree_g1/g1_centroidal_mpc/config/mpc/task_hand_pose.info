@@ -551,6 +551,35 @@ collision_constraint
 
       kneeCollisionSphereRadius        0.07
     }
+    arm_body {
+      active                      true
+
+      leftElbowFrame              left_elbow_link
+      rightElbowFrame             right_elbow_link
+      leftForearmFrame            left_wrist_roll_link
+      rightForearmFrame           right_wrist_roll_link
+      leftHandFrame               left_rubber_hand
+      rightHandFrame              right_rubber_hand
+      leftUpperLegFrame           left_hip_yaw_joint
+      rightUpperLegFrame          right_hip_yaw_joint
+      leftKneeFrame               left_knee_joint
+      rightKneeFrame              right_knee_joint
+      leftLowerLegFrame           left_ankle_pitch_joint
+      rightLowerLegFrame          right_ankle_pitch_joint
+      torsoFrame                  torso_link
+
+      elbowSphereRadius           0.055
+      forearmSphereRadius         0.045
+      handSphereRadius            0.045
+      upperLegSphereRadius        0.075
+      kneeSphereRadius            0.07
+      lowerLegSphereRadius        0.06
+      torsoSphereRadius           0.10
+
+      ; relaxed log barrier parameters
+      mu                          10000
+      delta                       0.03
+    }
     ; relaxed log barrier parameters
     mu                     30000
     delta                  0.05     
