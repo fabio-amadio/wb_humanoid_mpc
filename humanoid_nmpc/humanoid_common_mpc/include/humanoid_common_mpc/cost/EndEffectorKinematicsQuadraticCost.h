@@ -54,6 +54,8 @@ class EndEffectorKinematicsQuadraticCost : public ocs2::StateInputCostGaussNewto
     scalar_t gainScale = 1.0;
     scalar_t speedThreshold = 0.05;
     scalar_t fullScaleSpeed = 0.35;
+    scalar_t angularSpeedThreshold = 0.05;
+    scalar_t angularSpeedFullScale = 0.35;
   };
 
   EndEffectorKinematicsQuadraticCost(EndEffectorKinematicsWeights weights,

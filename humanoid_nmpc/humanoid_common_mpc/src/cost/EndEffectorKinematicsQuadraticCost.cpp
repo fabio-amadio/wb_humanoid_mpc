@@ -173,16 +173,24 @@ scalar_t EndEffectorKinematicsQuadraticCost::getWalkingGainScale(const vector_t&
     return 1.0;
   }
 
-  const scalar_t speed = xRef.head<2>().norm();
+  const scalar_t linearSpeed = xRef.head<2>().norm();
+  const scalar_t angularSpeed = std::abs(xRef(5));
   const scalar_t threshold = std::max<scalar_t>(walkingGainSchedule_.speedThreshold, 0.0);
   const scalar_t fullScaleSpeed = std::max<scalar_t>(walkingGainSchedule_.fullScaleSpeed, threshold);
+  const scalar_t angularThreshold = std::max<scalar_t>(walkingGainSchedule_.angularSpeedThreshold, 0.0);
+  const scalar_t angularFullScaleSpeed = std::max<scalar_t>(walkingGainSchedule_.angularSpeedFullScale, angularThreshold);
   const scalar_t clampedGainScale = std::clamp(walkingGainSchedule_.gainScale, scalar_t(0.0), scalar_t(1.0));
 
-  if (fullScaleSpeed <= threshold + 1e-9) {
-    return speed > threshold ? clampedGainScale : 1.0;
-  }
+  const auto getScheduleAlpha = [](scalar_t speed, scalar_t threshold, scalar_t fullScaleSpeed) {
+    if (fullScaleSpeed <= threshold + 1e-9) {
+      return speed > threshold ? scalar_t(1.0) : scalar_t(0.0);
+    }
+    return std::clamp((speed - threshold) / (fullScaleSpeed - threshold), scalar_t(0.0), scalar_t(1.0));
+  };
 
-  const scalar_t alpha = std::clamp((speed - threshold) / (fullScaleSpeed - threshold), scalar_t(0.0), scalar_t(1.0));
+  const scalar_t alpha =
+      std::max(getScheduleAlpha(linearSpeed, threshold, fullScaleSpeed),
+               getScheduleAlpha(angularSpeed, angularThreshold, angularFullScaleSpeed));
   return (1.0 - alpha) + alpha * clampedGainScale;
 }
 

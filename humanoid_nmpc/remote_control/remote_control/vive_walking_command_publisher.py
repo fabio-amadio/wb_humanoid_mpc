@@ -83,7 +83,7 @@ class ViveWalkingCommandPublisher(Node):
             "pressed_threshold", 0.5
         ).value
         self.trackpad_deadband = self.declare_parameter(
-            "trackpad_deadband", 0.1
+            "trackpad_deadband", 0.35
         ).value
         self.waist_yaw_rate = self.declare_parameter("waist_yaw_rate", 0.8).value
         self.waist_yaw_min = self.declare_parameter(

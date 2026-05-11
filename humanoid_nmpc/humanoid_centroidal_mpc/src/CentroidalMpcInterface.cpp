@@ -366,6 +366,15 @@ void CentroidalMpcInterface::addTaskSpaceKinematicsCosts(
       walkingGainSchedule.active = true;
       walkingGainSchedule.fullScaleSpeed = *fullScaleSpeed;
     }
+    if (const auto angularSpeedThreshold = task_space_costs_pt.get_optional<scalar_t>(costName + ".walkingAngularSpeedThreshold")) {
+      walkingGainSchedule.active = true;
+      walkingGainSchedule.angularSpeedThreshold = *angularSpeedThreshold;
+    }
+    if (const auto angularSpeedFullScale =
+            task_space_costs_pt.get_optional<scalar_t>(costName + ".walkingAngularSpeedFullScale")) {
+      walkingGainSchedule.active = true;
+      walkingGainSchedule.angularSpeedFullScale = *angularSpeedFullScale;
+    }
 
     bool usePelvisFrameReference = false;
     loadData::loadPtreeValue(task_space_costs_pt, usePelvisFrameReference, costName + ".pelvis_frame_pose_reference", verbose_);

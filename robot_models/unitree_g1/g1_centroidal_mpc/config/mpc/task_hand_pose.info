@@ -394,13 +394,15 @@ task_space_costs
     walkingGainScale           0.25
     walkingSpeedThreshold      0.05
     walkingSpeedFullScale      0.20
+    walkingAngularSpeedThreshold 0.05
+    walkingAngularSpeedFullScale 0.20
     weights {
-      pos_x               200.0
-      pos_y               200.0
-      pos_z               200.0
-      orientation_x       200.0
-      orientation_y       200.0
-      orientation_z       200.0
+      pos_x               100.0
+      pos_y               100.0
+      pos_z               100.0
+      orientation_x       50.0
+      orientation_y       50.0
+      orientation_z       50.0
       lin_velocity_x      0.5
       lin_velocity_y      0.5
       lin_velocity_z      0.5
@@ -423,13 +425,15 @@ task_space_costs
     walkingGainScale           0.25
     walkingSpeedThreshold      0.05
     walkingSpeedFullScale      0.20
+    walkingAngularSpeedThreshold 0.05
+    walkingAngularSpeedFullScale 0.20
     weights {
-      pos_x               200.0
-      pos_y               200.0
-      pos_z               200.0
-      orientation_x       200.0
-      orientation_y       200.0
-      orientation_z       200.0
+      pos_x               100.0
+      pos_y               100.0
+      pos_z               100.0
+      orientation_x       50.0
+      orientation_y       50.0
+      orientation_z       50.0
       lin_velocity_x      0.5
       lin_velocity_y      0.5
       lin_velocity_z      0.5
