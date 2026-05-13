@@ -521,13 +521,13 @@ contacts
   {
     frictionCoefficient    0.4
     ; relaxed log barrier parameters
-    mu                     0.2
+    mu                     0.9
     delta                  5.0 
   }
   contactMomentXYSoftConstraint
   {
     ; relaxed log barrier parameters
-    mu                     0.6
+    mu                     0.9
     delta                  0.03 
   }
 }
