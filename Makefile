@@ -245,6 +245,16 @@ generate-g1-random-mpc-npz:
 		--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz \
 		$(GENERATOR_ARGS)
 
+generate-g1-random-hand-pose-mpc-npz:
+	cd ${build_dir} && \
+	source ${ros_source_file} && \
+	source install/setup.bash && \
+	ros2 run humanoid_centroidal_mpc_ros2 humanoid_centroidal_mpc_random_hand_pose_generator \
+		--task-file /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task_hand_pose.info \
+		--reference-file /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/command/reference_random_hand_pose.info \
+		--output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_random_hand_pose_mpc_reference.npz \
+		$(GENERATOR_ARGS)
+
 launch-g1-sim-locomotion:
 	cd ${build_dir} && \
 	source ${ros_source_file} && \

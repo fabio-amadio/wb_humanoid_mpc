@@ -20,7 +20,7 @@ The main user-facing workflows in this repo are:
 - MuJoCo simulation
 - Cartesian hand reference control through RViz interactive markers and ROS topics
 - Vive-based locomotion command input
-- random-motion NPZ motion reference generation
+- random NPZ motion reference generation
 
 ## Docker Workflow
 
@@ -33,7 +33,7 @@ cd docker
 ./image_build.bash
 ```
 
-This builds the `wb-humanoid-mpc:dev` image defined by [docker/Dockerfile](/home/famadio/Workspace/wb_humanoid_mpc/docker/Dockerfile).
+This builds the `wb-humanoid-mpc:dev` image defined by [docker/Dockerfile](docker/Dockerfile).
 
 ### Launch the Container
 
@@ -78,9 +78,9 @@ There are two main runtime tasks in this repo:
 
 For tuning, start from:
 
-- locomotion MPC task: [task_locomotion.info](/home/famadio/Workspace/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task_locomotion.info)
-- hand-pose MPC task: [task_hand_pose.info](/home/famadio/Workspace/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task_hand_pose.info)
-- runtime reference and command settings: [reference.info](/home/famadio/Workspace/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/command/reference.info)
+- locomotion MPC task: [task_locomotion.info](robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task_locomotion.info)
+- hand-pose MPC task: [task_hand_pose.info](robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task_hand_pose.info)
+- runtime reference and command settings: [reference.info](robot_models/unitree_g1/g1_centroidal_mpc/config/command/reference.info)
 
 ### Dummy Simulation
 
@@ -109,18 +109,6 @@ Besides the base/height/waist command, this expects torso-frame hand pose comman
 /g1/right_hand_pose_reference
 ```
 
-If you want the same hand-pose topics available for an external teleop source without the RViz interactive markers, use:
-
-```bash
-make launch-g1-dummy-sim-teleop
-```
-
-To use that teleop setup while also publishing `/g1/mpc_motion_reference` for the RL policy, use:
-
-```bash
-make launch-g1-dummy-sim-teleop-pub-mpc-motion-ref
-```
-
 The first time you launch a given configuration, code generation may take several minutes.
 
 ### MuJoCo Simulation
@@ -137,20 +125,6 @@ Launch the **hand-pose task** in the MuJoCo sim:
 make launch-g1-sim-hand-pose
 ```
 
-## Vive Locomotion Control
-
-The teleop node subscribes to:
-
-- `/vive/right/joint_states`
-- `/vive/left/joint_states`
-
-It is launched by the teleop launch variants and publishes `/humanoid/walking_velocity_command`.
-
-The mapping is:
-
-- from `/vive/right/joint_states`: `trackpad_x` and `trackpad_y` control linear velocity `x/y` only when `trackpad_pressed == 1`
-- from `/vive/left/joint_states`: `trackpad_y` controls yaw velocity only when `trackpad_pressed == 1`
-
 ## Hand Pose Control
 
 The hand-pose launch exposes torso-frame hand references for both hands.
@@ -161,6 +135,36 @@ RViz includes interactive markers under `Hand Pose Markers`. Moving them publish
 - `/g1/right_hand_pose_reference`
 
 Both are expected in the `torso_link` frame.
+
+## Vive Locomotion Control
+
+To send commands to the MPC from an external Vive teleop source without the RViz interactive markers, use:
+
+```bash
+make launch-g1-dummy-sim-teleop
+```
+
+To use that teleop setup while also publishing `/g1/mpc_motion_reference` for the RL policy, use:
+
+```bash
+make launch-g1-dummy-sim-teleop-pub-mpc-motion-ref
+```
+
+The teleop node subscribes to:
+
+- `/vive/right/joint_states`
+- `/vive/left/joint_states`
+
+It is launched by the teleop launch variants and publishes over:
+
+- `/g1/left_hand_pose_reference` for the desired left hand pose
+- `/g1/right_hand_pose_reference` for the desired right hand pose
+- `/humanoid/walking_velocity_command` for the desired walking velocity
+
+The walking-velocity mapping from the Vive controllers is:
+
+- from `/vive/right/joint_states`: `trackpad_x` and `trackpad_y` control linear velocity `x/y` only when `trackpad_pressed == 1`
+- from `/vive/left/joint_states`: `trackpad_y` controls yaw velocity only when `trackpad_pressed == 1`
 
 ## MPC Motion Reference Export
 
@@ -190,7 +194,7 @@ The flattened command layout matches the one adopted by [**YAHMP**](https://gith
 [joint_pos, joint_vel, base_vx_body, base_vy_body, base_yaw_rate_body, base_height, base_roll, base_pitch]
 ```
 
-To publish compact motions references with the current step plus future steps:
+To publish compact motion references with the current step plus future steps:
 
 ```bash
 make launch-g1-dummy-sim-locomotion-pub-mpc-future-motion-ref
@@ -209,17 +213,17 @@ This publishes `/g1/mpc_future_motion_reference`, which contains:
 - `dt`: the YAHMP control step, currently `0.02 s`
 - `motion_cmd`: a step-major concatenation of the compact layout above, one block per listed step
 
-### Deployment via HURo
+## Deployment via HURo
 
 Deployment on the real G1 robot has been tested using [**HURo**](https://github.com/hucebot/huro).
 
-To communicate with the HURo docker in simulation, use:
+To communicate with the HURo Docker container in simulation, use:
 
 ```bash
 source setup_uri.sh lo
 ```
 
-Instead, to communicate with the HURo docker and the real robot, use:
+To communicate with the HURo Docker container and the real robot, use:
 
 ```bash
 source setup_uri.sh <eth-interface>
@@ -227,7 +231,9 @@ source setup_uri.sh <eth-interface>
 
 where `<eth-interface>` is the name of the ethernet interface used to connect to the robot.
 
-### Random MPC Motion Reference Generation
+## Random MPC Motion Reference Generation
+
+### Joint-Reference Random Generator
 
 To generate random motion references and store them directly to NPZ:
 
@@ -253,8 +259,49 @@ This random-generation task uses the full 29-DOF G1 MPC model.
 
 For tuning the random generator, start from:
 
-- random-generation MPC task: [task_random_reference.info](/home/famadio/Workspace/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task_random_reference.info)
-- random-generation reference and command settings: [reference_random_reference.info](/home/famadio/Workspace/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/command/reference_random_reference.info)
+- random-generation MPC task: [task_random_reference.info](robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task_random_reference.info)
+- random-generation reference and command settings: [reference_random_reference.info](robot_models/unitree_g1/g1_centroidal_mpc/config/command/reference_random_reference.info)
+
+### Hand-Pose Random Generator
+
+To generate random hand-pose motions with the hand-pose task:
+
+```bash
+make generate-g1-random-hand-pose-mpc-npz
+```
+
+This writes:
+
+```bash
+/wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_random_hand_pose_mpc_reference.npz
+```
+
+The hand-pose generator keeps the pelvis height fixed, samples smooth Cartesian hand-pose targets in the torso frame, and switches between two random modes:
+
+- `manipulation`: zero base velocity, stance behavior, full hand workspace
+- `walking`: random locomotion command, reduced hand workspace
+
+New hand-pose targets are sampled as bounded local steps from the previous target, then clamped to the configured workspace. This avoids occasional large hand jumps while still exploring the workspace over time. Manipulation resamples hand targets faster than walking by default; tune this with `segment_min`, `segment_max`, and `manipulation_probability` in `reference_random_hand_pose.info`.
+
+By default, the hand-pose NPZ stores only the generated motion. To also store the sampled command targets, run:
+
+```bash
+make generate-g1-random-hand-pose-mpc-npz GENERATOR_ARGS="--save-additional-info"
+```
+
+This adds:
+
+- `base_command.npy`
+- `left_hand_target_pos.npy`
+- `right_hand_target_pos.npy`
+- `left_hand_target_quat.npy`
+- `right_hand_target_quat.npy`
+- `random_mode.npy`
+
+For tuning the hand-pose generator, start from:
+
+- hand-pose MPC task: [task_hand_pose.info](robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task_hand_pose.info)
+- hand-pose random reference and sampling ranges: [reference_random_hand_pose.info](robot_models/unitree_g1/g1_centroidal_mpc/config/command/reference_random_hand_pose.info)
 
 #### Batch Generation
 
@@ -264,33 +311,20 @@ To generate multiple motions:
 make generate-g1-random-mpc-npz GENERATOR_ARGS="--num-motions 10"
 ```
 
+For the hand-pose generator, use:
+
+```bash
+make generate-g1-random-hand-pose-mpc-npz GENERATOR_ARGS="--num-motions 10"
+```
+
 Each output gets a numbered suffix such as:
 
 - `g1_random_mpc_reference_0000.npz`
 - `g1_random_mpc_reference_0001.npz`
+- `g1_random_hand_pose_mpc_reference_0000.npz`
+- `g1_random_hand_pose_mpc_reference_0001.npz`
 
-#### Direct Generator Usage
-
-You can also run the generator directly:
-
-```bash
-ros2 run humanoid_centroidal_mpc_ros2 humanoid_centroidal_mpc_random_reference_generator \
-  --task-file /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task_random_reference.info \
-  --reference-file /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/robot_models/unitree_g1/g1_centroidal_mpc/config/command/reference_random_reference.info \
-  --output /wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz \
-  --duration 20.0 \
-  --fps 30.0 \
-  --seed 1 \
-  --num-motions 10 \
-  --max-attempts-per-motion 20 \
-  --stance-probability 0.20 \
-  --heading-prob 0.80 \
-  --heading-min -3.14159 \
-  --heading-max 3.14159 \
-  --heading-control-stiffness 1.0 \
-  --base-command-deadband 0.1 \
-  --upper-body-fixed-probability 0.20
-```
+Use `GENERATOR_ARGS` to pass generator options such as `--duration`, `--fps`, `--seed`, `--num-motions`, or `--save-additional-info`.
 
 ## Acknowledgements
 

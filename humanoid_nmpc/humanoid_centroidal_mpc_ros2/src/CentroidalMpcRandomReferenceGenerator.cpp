@@ -41,6 +41,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ocs2_robotic_tools/common/RotationTransforms.h>
 #include <ocs2_sqp/SqpMpc.h>
 
+#include <boost/property_tree/info_parser.hpp>
+#include <boost/property_tree/ptree.hpp>
+
 #include <humanoid_centroidal_mpc/CentroidalMpcInterface.h>
 #include <humanoid_centroidal_mpc/command/CentroidalMpcTargetTrajectoriesCalculator.h>
 #include <humanoid_common_mpc/gait/GaitScheduleUpdater.h>
@@ -48,6 +51,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <humanoid_common_mpc/gait/MotionPhaseDefinition.h>
 #include <humanoid_common_mpc/pinocchio_model/createPinocchioModel.h>
 #include <humanoid_common_mpc/reference_manager/BreakFrequencyAlphaFilter.h>
+#include <humanoid_common_mpc/reference_manager/HandPoseReferenceManager.h>
 #include <humanoid_common_mpc/reference_manager/ProceduralMpcMotionManager.h>
 
 #include <algorithm>
@@ -62,6 +66,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <iostream>
 #include <limits>
 #include <numeric>
+#include <optional>
 #include <random>
 #include <sstream>
 #include <stdexcept>
@@ -118,7 +123,13 @@ struct Options {
   std::string referenceFile;
   std::string urdfFile;
   std::string gaitFile;
+#ifdef HAND_POSE_RANDOM_GENERATOR
+  bool handPoseMode = true;
+  std::string output = "/wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_random_hand_pose_mpc_reference.npz";
+#else
+  bool handPoseMode = false;
   std::string output = "/wb_humanoid_mpc_ws/src/wb_humanoid_mpc/generated_motions/g1_random_mpc_reference.npz";
+#endif
   scalar_t duration = 20.0;
   scalar_t fps = 30.0;
   uint32_t seed = 1;
@@ -148,6 +159,13 @@ struct Options {
   scalar_t headingMax = kPi;
   scalar_t headingControlStiffness = 1.0;
   scalar_t upperBodyFixedProbability = 0.2;
+  scalar_t manipulationProbability = 0.45;
+  bool manipulationProbabilityOverridden = false;
+  scalar_t modeSegmentMin = 4.0;
+  scalar_t modeSegmentMax = 8.0;
+  scalar_t handHoldPreviousValueProbability = 0.15;
+  scalar_t minimumHandSeparation = 0.10;
+  bool saveAdditionalInfo = false;
 };
 
 struct SmoothScalarTrajectory {
@@ -208,6 +226,105 @@ struct HeadingSchedule {
   }
 };
 
+enum class HandPoseRandomMode : uint8_t { WALKING = 0, MANIPULATION = 1 };
+
+struct ModeSchedule {
+  std::vector<scalar_t> times;
+  std::vector<HandPoseRandomMode> values;
+
+  HandPoseRandomMode value(scalar_t time) const {
+    if (times.empty()) {
+      return HandPoseRandomMode::WALKING;
+    }
+    const auto upper = std::upper_bound(times.begin(), times.end(), time);
+    if (upper == times.begin()) {
+      return values.front();
+    }
+    return values[static_cast<size_t>(std::distance(times.begin(), upper) - 1)];
+  }
+};
+
+struct HandPoseBounds {
+  vector3_t positionMin = vector3_t::Zero();
+  vector3_t positionMax = vector3_t::Zero();
+  vector3_t orientationRpyMin = vector3_t::Zero();
+  vector3_t orientationRpyMax = vector3_t::Zero();
+  vector3_t positionStepMax = vector3_t::Constant(0.10);
+  vector3_t orientationRpyStepMax = vector3_t::Constant(0.20);
+};
+
+struct SmoothVectorTrajectory {
+  std::vector<scalar_t> times;
+  std::vector<vector3_t> values;
+
+  vector3_t value(scalar_t time) const {
+    if (times.empty() || values.empty()) {
+      throw std::runtime_error("SmoothVectorTrajectory is empty.");
+    }
+    if (time <= times.front()) {
+      return values.front();
+    }
+    if (time >= times.back()) {
+      return values.back();
+    }
+
+    const auto upper = std::upper_bound(times.begin(), times.end(), time);
+    const size_t i1 = static_cast<size_t>(std::distance(times.begin(), upper));
+    const size_t i0 = i1 - 1;
+    const scalar_t alpha = (time - times[i0]) / (times[i1] - times[i0]);
+    const scalar_t smoothAlpha = 0.5 - 0.5 * std::cos(kPi * alpha);
+    return values[i0] + smoothAlpha * (values[i1] - values[i0]);
+  }
+};
+
+struct SmoothQuaternionTrajectory {
+  std::vector<scalar_t> times;
+  std::vector<quaternion_t> values;
+
+  quaternion_t value(scalar_t time) const {
+    if (times.empty() || values.empty()) {
+      throw std::runtime_error("SmoothQuaternionTrajectory is empty.");
+    }
+    if (time <= times.front()) {
+      return values.front();
+    }
+    if (time >= times.back()) {
+      return values.back();
+    }
+
+    const auto upper = std::upper_bound(times.begin(), times.end(), time);
+    const size_t i1 = static_cast<size_t>(std::distance(times.begin(), upper));
+    const size_t i0 = i1 - 1;
+    const scalar_t alpha = (time - times[i0]) / (times[i1] - times[i0]);
+    const scalar_t smoothAlpha = 0.5 - 0.5 * std::cos(kPi * alpha);
+    return values[i0].slerp(smoothAlpha, values[i1]).normalized();
+  }
+};
+
+struct SmoothHandPoseTrajectory {
+  SmoothVectorTrajectory position;
+  SmoothQuaternionTrajectory orientation;
+
+  HandPoseReference value(scalar_t time) const {
+    HandPoseReference reference;
+    reference.positionInReferenceFrame = position.value(time);
+    reference.orientationReferenceToHand = orientation.value(time);
+    return reference;
+  }
+};
+
+struct HandPoseRandomConfig {
+  HandPoseBounds manipulationLeft;
+  HandPoseBounds manipulationRight;
+  HandPoseBounds walkingLeft;
+  HandPoseBounds walkingRight;
+  scalar_t manipulationProbability = 0.45;
+  scalar_t manipulationSegmentMin = 1.5;
+  scalar_t manipulationSegmentMax = 3.0;
+  scalar_t walkingSegmentMin = 3.0;
+  scalar_t walkingSegmentMax = 6.0;
+};
+
 struct MotionBuffers {
   std::vector<float> jointPos;
   std::vector<float> jointVel;
@@ -217,6 +334,12 @@ struct MotionBuffers {
   std::vector<float> bodyAngVel;
   std::vector<float> contactWrench;
   std::vector<uint8_t> contactFlags;
+  std::vector<float> baseCommand;
+  std::vector<float> leftHandTargetPos;
+  std::vector<float> rightHandTargetPos;
+  std::vector<float> leftHandTargetQuat;
+  std::vector<float> rightHandTargetQuat;
+  std::vector<uint8_t> randomMode;
   std::vector<double> fps;
   size_t numFrames = 0;
   size_t numJoints = 0;
@@ -416,11 +539,23 @@ void saveClampNpz(const std::filesystem::path& path,
   const size_t expectedBodyQuaternionScalars = buffers.numFrames * buffers.numBodies * 4;
   const size_t expectedContactWrenchScalars = buffers.numFrames * buffers.numContacts * 6;
   const size_t expectedContactFlagScalars = buffers.numFrames * buffers.numContacts;
+  const size_t expectedBaseCommandScalars = buffers.numFrames * 4;
+  const size_t expectedHandPositionScalars = buffers.numFrames * 3;
+  const size_t expectedHandQuaternionScalars = buffers.numFrames * 4;
   if (buffers.jointPos.size() != expectedJointScalars || buffers.jointVel.size() != expectedJointScalars ||
       buffers.bodyPos.size() != expectedBodyPositionScalars || buffers.bodyLinVel.size() != expectedBodyPositionScalars ||
       buffers.bodyAngVel.size() != expectedBodyPositionScalars || buffers.bodyQuat.size() != expectedBodyQuaternionScalars ||
       buffers.contactWrench.size() != expectedContactWrenchScalars || buffers.contactFlags.size() != expectedContactFlagScalars) {
     throw std::runtime_error("Motion buffer sizes do not match the requested NPZ shapes.");
+  }
+  const bool hasCommandTargets = !buffers.baseCommand.empty() || !buffers.leftHandTargetPos.empty() || !buffers.rightHandTargetPos.empty() ||
+                                 !buffers.leftHandTargetQuat.empty() || !buffers.rightHandTargetQuat.empty() || !buffers.randomMode.empty();
+  if (hasCommandTargets &&
+      (buffers.baseCommand.size() != expectedBaseCommandScalars || buffers.leftHandTargetPos.size() != expectedHandPositionScalars ||
+       buffers.rightHandTargetPos.size() != expectedHandPositionScalars ||
+       buffers.leftHandTargetQuat.size() != expectedHandQuaternionScalars ||
+       buffers.rightHandTargetQuat.size() != expectedHandQuaternionScalars || buffers.randomMode.size() != buffers.numFrames)) {
+    throw std::runtime_error("Command target buffer sizes do not match the requested NPZ shapes.");
   }
 
   std::vector<ZipEntry> entries;
@@ -432,6 +567,14 @@ void saveClampNpz(const std::filesystem::path& path,
   entries.push_back({"body_ang_vel_w.npy", makeNumericNpy(buffers.bodyAngVel, "<f4", {buffers.numFrames, buffers.numBodies, 3})});
   entries.push_back({"contact_wrench_w.npy", makeNumericNpy(buffers.contactWrench, "<f4", {buffers.numFrames, buffers.numContacts, 6})});
   entries.push_back({"contact_flags.npy", makeNumericNpy(buffers.contactFlags, "|u1", {buffers.numFrames, buffers.numContacts})});
+  if (hasCommandTargets) {
+    entries.push_back({"base_command.npy", makeNumericNpy(buffers.baseCommand, "<f4", {buffers.numFrames, 4})});
+    entries.push_back({"left_hand_target_pos.npy", makeNumericNpy(buffers.leftHandTargetPos, "<f4", {buffers.numFrames, 3})});
+    entries.push_back({"right_hand_target_pos.npy", makeNumericNpy(buffers.rightHandTargetPos, "<f4", {buffers.numFrames, 3})});
+    entries.push_back({"left_hand_target_quat.npy", makeNumericNpy(buffers.leftHandTargetQuat, "<f4", {buffers.numFrames, 4})});
+    entries.push_back({"right_hand_target_quat.npy", makeNumericNpy(buffers.rightHandTargetQuat, "<f4", {buffers.numFrames, 4})});
+    entries.push_back({"random_mode.npy", makeNumericNpy(buffers.randomMode, "|u1", {buffers.numFrames})});
+  }
   entries.push_back({"body_names.npy", makeStringNpy(bodyNames, 32)});
   entries.push_back({"body_link_names.npy", makeStringNpy(bodyNames, 32)});
   entries.push_back({"contact_names.npy", makeStringNpy(contactNames, 32)});
@@ -474,8 +617,13 @@ Options parseOptions(int argc, char** argv) {
   const auto g1MpcShare = ament_index_cpp::get_package_share_directory("g1_centroidal_mpc");
   const auto g1DescriptionShare = ament_index_cpp::get_package_share_directory("g1_description");
   const auto commonMpcShare = ament_index_cpp::get_package_share_directory("humanoid_common_mpc");
+#ifdef HAND_POSE_RANDOM_GENERATOR
+  options.taskFile = g1MpcShare + "/config/mpc/task_hand_pose.info";
+  options.referenceFile = g1MpcShare + "/config/command/reference_random_hand_pose.info";
+#else
   options.taskFile = g1MpcShare + "/config/mpc/task_random_reference.info";
   options.referenceFile = g1MpcShare + "/config/command/reference_random_reference.info";
+#endif
   options.urdfFile = g1DescriptionShare + "/urdf/g1_29dof.urdf";
   options.gaitFile = commonMpcShare + "/config/command/gait.info";
 
@@ -535,6 +683,25 @@ Options parseOptions(int argc, char** argv) {
       options.headingControlStiffness = parseScalar(requireValue(i, argc, argv), arg);
     } else if (arg == "--upper-body-fixed-probability") {
       options.upperBodyFixedProbability = parseScalar(requireValue(i, argc, argv), arg);
+    } else if (arg == "--hand-pose-mode") {
+      options.handPoseMode = true;
+    } else if (arg == "--joint-reference-mode") {
+      options.handPoseMode = false;
+    } else if (arg == "--manipulation-probability") {
+      options.manipulationProbability = parseScalar(requireValue(i, argc, argv), arg);
+      options.manipulationProbabilityOverridden = true;
+    } else if (arg == "--mode-segment-min") {
+      options.modeSegmentMin = parseScalar(requireValue(i, argc, argv), arg);
+    } else if (arg == "--mode-segment-max") {
+      options.modeSegmentMax = parseScalar(requireValue(i, argc, argv), arg);
+    } else if (arg == "--hand-hold-probability") {
+      options.handHoldPreviousValueProbability = parseScalar(requireValue(i, argc, argv), arg);
+    } else if (arg == "--minimum-hand-separation") {
+      options.minimumHandSeparation = parseScalar(requireValue(i, argc, argv), arg);
+    } else if (arg == "--save-additional-info") {
+      options.saveAdditionalInfo = true;
+    } else if (arg == "--no-save-additional-info") {
+      options.saveAdditionalInfo = false;
     } else if (arg == "--wrist-segment-min") {
       options.wristSegmentMin = parseScalar(requireValue(i, argc, argv), arg);
     } else if (arg == "--wrist-segment-max") {
@@ -548,6 +715,10 @@ Options parseOptions(int argc, char** argv) {
                 << "       [--cmd-vel-segment-min SEC] [--cmd-vel-segment-max SEC]\n"
                 << "       [--stance-probability P] [--heading-prob P] [--upper-body-fixed-probability P]\n"
                 << "       [--heading-min RAD] [--heading-max RAD] [--heading-control-stiffness K]\n"
+                << "       [--hand-pose-mode] [--joint-reference-mode]\n"
+                << "       [--manipulation-probability P] [--mode-segment-min SEC] [--mode-segment-max SEC]\n"
+                << "       [--hand-hold-probability P]\n"
+                << "       [--minimum-hand-separation M] [--save-additional-info]\n"
                 << "       [--wrist-segment-min SEC] [--wrist-segment-max SEC]\n"
                 << "       [--task-file PATH] [--reference-file PATH] [--urdf-file PATH] [--gait-file PATH]\n";
       std::exit(0);
@@ -577,6 +748,12 @@ Options parseOptions(int argc, char** argv) {
   if (options.headingProbability < 0.0 || options.headingProbability > 1.0) {
     throw std::runtime_error("--heading-prob must be in [0, 1].");
   }
+  if (options.manipulationProbability < 0.0 || options.manipulationProbability > 1.0) {
+    throw std::runtime_error("--manipulation-probability must be in [0, 1].");
+  }
+  if (options.handHoldPreviousValueProbability < 0.0 || options.handHoldPreviousValueProbability > 1.0) {
+    throw std::runtime_error("--hand-hold-probability must be in [0, 1].");
+  }
   if (options.headingControlStiffness < 0.0) {
     throw std::runtime_error("--heading-control-stiffness must be non-negative.");
   }
@@ -592,6 +769,10 @@ Options parseOptions(int argc, char** argv) {
   requirePositiveSegmentRange(options.waistSegmentMin, options.waistSegmentMax, "--waist-segment-min/max");
   requirePositiveSegmentRange(options.armSegmentMin, options.armSegmentMax, "--arm-segment-min/max");
   requirePositiveSegmentRange(options.wristSegmentMin, options.wristSegmentMax, "--wrist-segment-min/max");
+  requirePositiveSegmentRange(options.modeSegmentMin, options.modeSegmentMax, "--mode-segment-min/max");
+  if (options.minimumHandSeparation < 0.0) {
+    throw std::runtime_error("--minimum-hand-separation must be non-negative.");
+  }
   return options;
 }
 
@@ -696,6 +877,27 @@ HeadingSchedule makeRandomHeadingSchedule(scalar_t duration,
   return schedule;
 }
 
+ModeSchedule makeRandomModeSchedule(scalar_t duration,
+                                    scalar_t segmentMin,
+                                    scalar_t segmentMax,
+                                    scalar_t manipulationProbability,
+                                    std::mt19937& rng) {
+  std::uniform_real_distribution<scalar_t> segmentDist(segmentMin, segmentMax);
+  std::bernoulli_distribution manipulationDist(std::clamp(manipulationProbability, scalar_t(0.0), scalar_t(1.0)));
+
+  ModeSchedule schedule;
+  schedule.times.push_back(0.0);
+  schedule.values.push_back(manipulationDist(rng) ? HandPoseRandomMode::MANIPULATION : HandPoseRandomMode::WALKING);
+
+  scalar_t time = 0.0;
+  while (time < duration) {
+    time = std::min(duration, time + segmentDist(rng));
+    schedule.times.push_back(time);
+    schedule.values.push_back(manipulationDist(rng) ? HandPoseRandomMode::MANIPULATION : HandPoseRandomMode::WALKING);
+  }
+  return schedule;
+}
+
 scalar_t wrapToPi(scalar_t angle) {
   while (angle > kPi) {
     angle -= 2.0 * kPi;
@@ -704,6 +906,224 @@ scalar_t wrapToPi(scalar_t angle) {
     angle += 2.0 * kPi;
   }
   return angle;
+}
+
+quaternion_t quaternionFromRpy(const vector3_t& rpy) {
+  const Eigen::AngleAxis<scalar_t> roll(rpy.x(), vector3_t::UnitX());
+  const Eigen::AngleAxis<scalar_t> pitch(rpy.y(), vector3_t::UnitY());
+  const Eigen::AngleAxis<scalar_t> yaw(rpy.z(), vector3_t::UnitZ());
+  return quaternion_t(yaw * pitch * roll).normalized();
+}
+
+vector3_t sampleVectorInBounds(const vector3_t& min, const vector3_t& max, std::mt19937& rng) {
+  vector3_t sample;
+  for (Eigen::Index i = 0; i < 3; ++i) {
+    std::uniform_real_distribution<scalar_t> dist(min[i], max[i]);
+    sample[i] = dist(rng);
+  }
+  return sample;
+}
+
+HandPoseReference sampleLocalHandPoseReference(const HandPoseBounds& bounds,
+                                               const HandPoseReference& previousReference,
+                                               std::mt19937& rng) {
+  HandPoseReference reference;
+  for (Eigen::Index i = 0; i < 3; ++i) {
+    std::uniform_real_distribution<scalar_t> dist(-bounds.positionStepMax[i], bounds.positionStepMax[i]);
+    reference.positionInReferenceFrame[i] =
+        std::clamp(previousReference.positionInReferenceFrame[i] + dist(rng), bounds.positionMin[i], bounds.positionMax[i]);
+  }
+  const vector3_t orientationOffsetRpy = sampleVectorInBounds(-bounds.orientationRpyStepMax, bounds.orientationRpyStepMax, rng);
+  reference.orientationReferenceToHand = (previousReference.orientationReferenceToHand * quaternionFromRpy(orientationOffsetRpy)).normalized();
+  return reference;
+}
+
+HandPoseBounds loadHandPoseBounds(const boost::property_tree::ptree& pt,
+                                  const std::string& mode,
+                                  const std::string& handName,
+                                  const vector3_t& fallbackPositionMin,
+                                  const vector3_t& fallbackPositionMax,
+                                  const vector3_t& fallbackOrientationMin,
+                                  const vector3_t& fallbackOrientationMax,
+                                  const vector3_t& fallbackPositionStepMax,
+                                  const vector3_t& fallbackOrientationStepMax) {
+  const std::string root = "randomHandPoseGenerator." + mode + "." + handName + ".";
+  HandPoseBounds bounds;
+  bounds.positionMin.x() = pt.get<scalar_t>(root + "x_min", fallbackPositionMin.x());
+  bounds.positionMax.x() = pt.get<scalar_t>(root + "x_max", fallbackPositionMax.x());
+  bounds.positionMin.y() = pt.get<scalar_t>(root + "y_min", fallbackPositionMin.y());
+  bounds.positionMax.y() = pt.get<scalar_t>(root + "y_max", fallbackPositionMax.y());
+  bounds.positionMin.z() = pt.get<scalar_t>(root + "z_min", fallbackPositionMin.z());
+  bounds.positionMax.z() = pt.get<scalar_t>(root + "z_max", fallbackPositionMax.z());
+  bounds.orientationRpyMin.x() = pt.get<scalar_t>(root + "roll_min", fallbackOrientationMin.x());
+  bounds.orientationRpyMax.x() = pt.get<scalar_t>(root + "roll_max", fallbackOrientationMax.x());
+  bounds.orientationRpyMin.y() = pt.get<scalar_t>(root + "pitch_min", fallbackOrientationMin.y());
+  bounds.orientationRpyMax.y() = pt.get<scalar_t>(root + "pitch_max", fallbackOrientationMax.y());
+  bounds.orientationRpyMin.z() = pt.get<scalar_t>(root + "yaw_min", fallbackOrientationMin.z());
+  bounds.orientationRpyMax.z() = pt.get<scalar_t>(root + "yaw_max", fallbackOrientationMax.z());
+  bounds.positionStepMax.x() = pt.get<scalar_t>(root + "max_step_x", fallbackPositionStepMax.x());
+  bounds.positionStepMax.y() = pt.get<scalar_t>(root + "max_step_y", fallbackPositionStepMax.y());
+  bounds.positionStepMax.z() = pt.get<scalar_t>(root + "max_step_z", fallbackPositionStepMax.z());
+  bounds.orientationRpyStepMax.x() = pt.get<scalar_t>(root + "max_roll_step", fallbackOrientationStepMax.x());
+  bounds.orientationRpyStepMax.y() = pt.get<scalar_t>(root + "max_pitch_step", fallbackOrientationStepMax.y());
+  bounds.orientationRpyStepMax.z() = pt.get<scalar_t>(root + "max_yaw_step", fallbackOrientationStepMax.z());
+
+  if ((bounds.positionMin.array() > bounds.positionMax.array()).any() ||
+      (bounds.orientationRpyMin.array() > bounds.orientationRpyMax.array()).any() || (bounds.positionStepMax.array() < 0.0).any() ||
+      (bounds.orientationRpyStepMax.array() < 0.0).any()) {
+    throw std::runtime_error("Invalid hand-pose random bounds for " + mode + "." + handName + ".");
+  }
+  return bounds;
+}
+
+HandPoseRandomConfig loadHandPoseRandomConfig(const std::string& referenceFile) {
+  boost::property_tree::ptree pt;
+  boost::property_tree::read_info(referenceFile, pt);
+
+  const vector3_t narrowOrientationMin(-0.35, -0.35, -0.55);
+  const vector3_t narrowOrientationMax(0.35, 0.35, 0.55);
+  const vector3_t walkingOrientationMin(-0.20, -0.20, -0.35);
+  const vector3_t walkingOrientationMax(0.20, 0.20, 0.35);
+  const vector3_t manipulationPositionStepMax(0.18, 0.18, 0.18);
+  const vector3_t walkingPositionStepMax(0.08, 0.08, 0.08);
+  const vector3_t manipulationOrientationStepMax(0.25, 0.25, 0.35);
+  const vector3_t walkingOrientationStepMax(0.15, 0.15, 0.20);
+
+  vector3_t leftMin;
+  leftMin << pt.get<scalar_t>("handPositionBounds.left_hand.x_min"), pt.get<scalar_t>("handPositionBounds.left_hand.y_min"),
+      pt.get<scalar_t>("handPositionBounds.left_hand.z_min");
+  vector3_t leftMax;
+  leftMax << pt.get<scalar_t>("handPositionBounds.left_hand.x_max"), pt.get<scalar_t>("handPositionBounds.left_hand.y_max"),
+      pt.get<scalar_t>("handPositionBounds.left_hand.z_max");
+  vector3_t rightMin;
+  rightMin << pt.get<scalar_t>("handPositionBounds.right_hand.x_min"), pt.get<scalar_t>("handPositionBounds.right_hand.y_min"),
+      pt.get<scalar_t>("handPositionBounds.right_hand.z_min");
+  vector3_t rightMax;
+  rightMax << pt.get<scalar_t>("handPositionBounds.right_hand.x_max"), pt.get<scalar_t>("handPositionBounds.right_hand.y_max"),
+      pt.get<scalar_t>("handPositionBounds.right_hand.z_max");
+
+  HandPoseRandomConfig config;
+  config.manipulationLeft = loadHandPoseBounds(pt, "manipulation", "left_hand", leftMin, leftMax, narrowOrientationMin,
+                                               narrowOrientationMax, manipulationPositionStepMax, manipulationOrientationStepMax);
+  config.manipulationRight = loadHandPoseBounds(pt, "manipulation", "right_hand", rightMin, rightMax, narrowOrientationMin,
+                                                narrowOrientationMax, manipulationPositionStepMax, manipulationOrientationStepMax);
+
+  const vector3_t leftWalkingMin = 0.5 * (leftMin + leftMax) + vector3_t(-0.10, -0.08, -0.12);
+  const vector3_t leftWalkingMax = 0.5 * (leftMin + leftMax) + vector3_t(0.10, 0.08, 0.12);
+  const vector3_t rightWalkingMin = 0.5 * (rightMin + rightMax) + vector3_t(-0.10, -0.08, -0.12);
+  const vector3_t rightWalkingMax = 0.5 * (rightMin + rightMax) + vector3_t(0.10, 0.08, 0.12);
+  const vector3_t leftWalkingMinClamped = leftWalkingMin.cwiseMax(leftMin);
+  const vector3_t leftWalkingMaxClamped = leftWalkingMax.cwiseMin(leftMax);
+  const vector3_t rightWalkingMinClamped = rightWalkingMin.cwiseMax(rightMin);
+  const vector3_t rightWalkingMaxClamped = rightWalkingMax.cwiseMin(rightMax);
+  config.walkingLeft = loadHandPoseBounds(pt, "walking", "left_hand", leftWalkingMinClamped, leftWalkingMaxClamped, walkingOrientationMin,
+                                          walkingOrientationMax, walkingPositionStepMax, walkingOrientationStepMax);
+  config.walkingRight = loadHandPoseBounds(pt, "walking", "right_hand", rightWalkingMinClamped, rightWalkingMaxClamped,
+                                           walkingOrientationMin, walkingOrientationMax, walkingPositionStepMax, walkingOrientationStepMax);
+  config.manipulationProbability = pt.get<scalar_t>("randomHandPoseGenerator.manipulation_probability", config.manipulationProbability);
+  config.manipulationSegmentMin = pt.get<scalar_t>("randomHandPoseGenerator.manipulation.segment_min", config.manipulationSegmentMin);
+  config.manipulationSegmentMax = pt.get<scalar_t>("randomHandPoseGenerator.manipulation.segment_max", config.manipulationSegmentMax);
+  config.walkingSegmentMin = pt.get<scalar_t>("randomHandPoseGenerator.walking.segment_min", config.walkingSegmentMin);
+  config.walkingSegmentMax = pt.get<scalar_t>("randomHandPoseGenerator.walking.segment_max", config.walkingSegmentMax);
+  if (config.manipulationProbability < 0.0 || config.manipulationProbability > 1.0) {
+    throw std::runtime_error("randomHandPoseGenerator.manipulation_probability must be in [0, 1].");
+  }
+  requirePositiveSegmentRange(config.manipulationSegmentMin, config.manipulationSegmentMax,
+                              "randomHandPoseGenerator.manipulation.segment_min/max");
+  requirePositiveSegmentRange(config.walkingSegmentMin, config.walkingSegmentMax, "randomHandPoseGenerator.walking.segment_min/max");
+  return config;
+}
+
+struct HandPoseTrajectoryPair {
+  SmoothHandPoseTrajectory left;
+  SmoothHandPoseTrajectory right;
+};
+
+HandPoseTrajectoryPair makeRandomHandPoseTrajectories(const Options& options,
+                                                      const ModeSchedule& modeSchedule,
+                                                      const HandPoseRandomConfig& config,
+                                                      const HandPoseReference& defaultLeftReference,
+                                                      const HandPoseReference& defaultRightReference,
+                                                      std::mt19937& rng) {
+  std::bernoulli_distribution holdDist(std::clamp(options.handHoldPreviousValueProbability, scalar_t(0.0), scalar_t(1.0)));
+
+  HandPoseTrajectoryPair trajectories;
+  trajectories.left.position.times.push_back(0.0);
+  trajectories.left.position.values.push_back(defaultLeftReference.positionInReferenceFrame);
+  trajectories.left.orientation.times.push_back(0.0);
+  trajectories.left.orientation.values.push_back(defaultLeftReference.orientationReferenceToHand);
+  trajectories.right.position.times.push_back(0.0);
+  trajectories.right.position.values.push_back(defaultRightReference.positionInReferenceFrame);
+  trajectories.right.orientation.times.push_back(0.0);
+  trajectories.right.orientation.values.push_back(defaultRightReference.orientationReferenceToHand);
+
+  std::vector<scalar_t> knotTimes;
+  scalar_t time = 0.0;
+  while (time < options.duration) {
+    const bool manipulation = modeSchedule.value(time) == HandPoseRandomMode::MANIPULATION;
+    std::uniform_real_distribution<scalar_t> segmentDist(manipulation ? config.manipulationSegmentMin : config.walkingSegmentMin,
+                                                         manipulation ? config.manipulationSegmentMax : config.walkingSegmentMax);
+    time = std::min(options.duration, time + segmentDist(rng));
+    knotTimes.push_back(time);
+  }
+  for (const scalar_t modeTime : modeSchedule.times) {
+    if (modeTime > 0.0 && modeTime < options.duration) {
+      // Let the previous hand target finish at the mode switch, then sample a target for the new mode.
+      knotTimes.push_back(std::min(options.duration, modeTime + scalar_t(1e-3)));
+    }
+  }
+  std::sort(knotTimes.begin(), knotTimes.end());
+  knotTimes.erase(std::unique(knotTimes.begin(), knotTimes.end(),
+                              [](scalar_t a, scalar_t b) { return std::abs(a - b) < scalar_t(1e-9); }),
+                  knotTimes.end());
+
+  HandPoseRandomMode previousMode = modeSchedule.value(0.0);
+  for (const scalar_t knotTime : knotTimes) {
+    const HandPoseRandomMode currentMode = modeSchedule.value(knotTime);
+    const bool modeChanged = currentMode != previousMode;
+    const bool holdPrevious = !modeChanged && holdDist(rng);
+    HandPoseReference leftReference;
+    HandPoseReference rightReference;
+    if (holdPrevious) {
+      leftReference.positionInReferenceFrame = trajectories.left.position.values.back();
+      leftReference.orientationReferenceToHand = trajectories.left.orientation.values.back();
+      rightReference.positionInReferenceFrame = trajectories.right.position.values.back();
+      rightReference.orientationReferenceToHand = trajectories.right.orientation.values.back();
+    } else {
+      const bool manipulation = currentMode == HandPoseRandomMode::MANIPULATION;
+      const auto& leftBounds = manipulation ? config.manipulationLeft : config.walkingLeft;
+      const auto& rightBounds = manipulation ? config.manipulationRight : config.walkingRight;
+      HandPoseReference previousLeftReference;
+      previousLeftReference.positionInReferenceFrame = trajectories.left.position.values.back();
+      previousLeftReference.orientationReferenceToHand = trajectories.left.orientation.values.back();
+      HandPoseReference previousRightReference;
+      previousRightReference.positionInReferenceFrame = trajectories.right.position.values.back();
+      previousRightReference.orientationReferenceToHand = trajectories.right.orientation.values.back();
+      bool accepted = false;
+      for (int attempt = 0; attempt < 50; ++attempt) {
+        leftReference = sampleLocalHandPoseReference(leftBounds, previousLeftReference, rng);
+        rightReference = sampleLocalHandPoseReference(rightBounds, previousRightReference, rng);
+        if ((leftReference.positionInReferenceFrame - rightReference.positionInReferenceFrame).norm() >= options.minimumHandSeparation) {
+          accepted = true;
+          break;
+        }
+      }
+      if (!accepted) {
+        throw std::runtime_error("Failed to sample hand-pose targets respecting minimumHandSeparation.");
+      }
+    }
+
+    trajectories.left.position.times.push_back(knotTime);
+    trajectories.left.position.values.push_back(leftReference.positionInReferenceFrame);
+    trajectories.left.orientation.times.push_back(knotTime);
+    trajectories.left.orientation.values.push_back(leftReference.orientationReferenceToHand);
+    trajectories.right.position.times.push_back(knotTime);
+    trajectories.right.position.values.push_back(rightReference.positionInReferenceFrame);
+    trajectories.right.orientation.times.push_back(knotTime);
+    trajectories.right.orientation.values.push_back(rightReference.orientationReferenceToHand);
+    previousMode = currentMode;
+  }
+  return trajectories;
 }
 
 void throwIfNotFinite(const vector_t& vector, const std::string& name, size_t motionIndex, size_t frame, scalar_t time) {
@@ -832,6 +1252,29 @@ void appendContactData(MotionBuffers& buffers,
   }
 }
 
+void appendHandPoseCommandTargets(MotionBuffers& buffers,
+                                  const vector4_t& baseCommand,
+                                  const HandPoseReference& leftReference,
+                                  const HandPoseReference& rightReference,
+                                  HandPoseRandomMode mode) {
+  for (Eigen::Index i = 0; i < 4; ++i) {
+    buffers.baseCommand.push_back(static_cast<float>(baseCommand[i]));
+  }
+  for (Eigen::Index i = 0; i < 3; ++i) {
+    buffers.leftHandTargetPos.push_back(static_cast<float>(leftReference.positionInReferenceFrame[i]));
+    buffers.rightHandTargetPos.push_back(static_cast<float>(rightReference.positionInReferenceFrame[i]));
+  }
+  buffers.leftHandTargetQuat.push_back(static_cast<float>(leftReference.orientationReferenceToHand.w()));
+  buffers.leftHandTargetQuat.push_back(static_cast<float>(leftReference.orientationReferenceToHand.x()));
+  buffers.leftHandTargetQuat.push_back(static_cast<float>(leftReference.orientationReferenceToHand.y()));
+  buffers.leftHandTargetQuat.push_back(static_cast<float>(leftReference.orientationReferenceToHand.z()));
+  buffers.rightHandTargetQuat.push_back(static_cast<float>(rightReference.orientationReferenceToHand.w()));
+  buffers.rightHandTargetQuat.push_back(static_cast<float>(rightReference.orientationReferenceToHand.x()));
+  buffers.rightHandTargetQuat.push_back(static_cast<float>(rightReference.orientationReferenceToHand.y()));
+  buffers.rightHandTargetQuat.push_back(static_cast<float>(rightReference.orientationReferenceToHand.z()));
+  buffers.randomMode.push_back(static_cast<uint8_t>(mode));
+}
+
 void fillFiniteDifferenceBodyVelocities(MotionBuffers& buffers, scalar_t dt) {
   const size_t nFrames = buffers.numFrames;
   const size_t nBodies = buffers.numBodies;
@@ -891,6 +1334,7 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
 
   const auto& mpcRobotModel = interface.getMpcRobotModel();
   const auto& modelSettings = interface.modelSettings();
+  auto handPoseReferenceManagerPtr = interface.getSwitchedModelReferenceManagerPtr()->getHandPoseReferenceManagerPtr();
 
   scalar_t defaultBaseHeight = 0.0;
   vector_t defaultMpcJointState(mpcRobotModel.getJointDim());
@@ -903,27 +1347,29 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
 
   const auto randomizedMpcJointIndices = getRandomizedMpcJointIndices(modelSettings);
   std::unordered_map<size_t, SmoothScalarTrajectory> jointTrajectories;
-  for (const size_t mpcJointIndex : randomizedMpcJointIndices) {
-    const std::string& jointName = modelSettings.mpcModelJointNames[mpcJointIndex];
-    const auto [lowerRaw, upperRaw] = getJointLimits(fullModel, jointName);
-    scalar_t lower = lowerRaw + options.armLimitMargin * (upperRaw - lowerRaw);
-    scalar_t upper = upperRaw - options.armLimitMargin * (upperRaw - lowerRaw);
-    scalar_t segmentMin = options.armSegmentMin;
-    scalar_t segmentMax = options.armSegmentMax;
-    if (isWaistJoint(jointName)) {
-      lower = std::max(lower, -M_PI / 2.0);
-      upper = std::min(upper, M_PI / 2.0);
-      segmentMin = options.waistSegmentMin;
-      segmentMax = options.waistSegmentMax;
-    } else if (isWristJoint(jointName)) {
-      segmentMin = options.wristSegmentMin;
-      segmentMax = options.wristSegmentMax;
+  if (!options.handPoseMode) {
+    for (const size_t mpcJointIndex : randomizedMpcJointIndices) {
+      const std::string& jointName = modelSettings.mpcModelJointNames[mpcJointIndex];
+      const auto [lowerRaw, upperRaw] = getJointLimits(fullModel, jointName);
+      scalar_t lower = lowerRaw + options.armLimitMargin * (upperRaw - lowerRaw);
+      scalar_t upper = upperRaw - options.armLimitMargin * (upperRaw - lowerRaw);
+      scalar_t segmentMin = options.armSegmentMin;
+      scalar_t segmentMax = options.armSegmentMax;
+      if (isWaistJoint(jointName)) {
+        lower = std::max(lower, -M_PI / 2.0);
+        upper = std::min(upper, M_PI / 2.0);
+        segmentMin = options.waistSegmentMin;
+        segmentMax = options.waistSegmentMax;
+      } else if (isWristJoint(jointName)) {
+        segmentMin = options.wristSegmentMin;
+        segmentMax = options.wristSegmentMax;
+      }
+      jointTrajectories.emplace(mpcJointIndex,
+                                makeRandomSmoothTrajectory(options.duration, segmentMin, segmentMax, lower, upper,
+                                                           defaultMpcJointState[mpcJointIndex], options.upperBodyFixedProbability, rng));
+      std::cout << "[random_mpc_generator] sampling " << jointName << " in [" << lower << ", " << upper << "] every [" << segmentMin << ", "
+                << segmentMax << "] s\n";
     }
-    jointTrajectories.emplace(mpcJointIndex,
-                              makeRandomSmoothTrajectory(options.duration, segmentMin, segmentMax, lower, upper,
-                                                         defaultMpcJointState[mpcJointIndex], options.upperBodyFixedProbability, rng));
-    std::cout << "[random_mpc_generator] sampling " << jointName << " in [" << lower << ", " << upper << "] every [" << segmentMin << ", "
-              << segmentMax << "] s\n";
   }
 
   const auto vxTrajectory = makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax, options.vxMin,
@@ -938,6 +1384,27 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
       makeRandomStanceSchedule(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax, options.stanceProbability, rng);
   const auto headingSchedule = makeRandomHeadingSchedule(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
                                                          options.headingProbability, options.headingMin, options.headingMax, rng);
+
+  std::optional<HandPoseTrajectoryPair> handPoseTrajectories;
+  ModeSchedule modeSchedule;
+  if (options.handPoseMode) {
+    const auto leftDefaultReference = handPoseReferenceManagerPtr->getReference("left_hand");
+    const auto rightDefaultReference = handPoseReferenceManagerPtr->getReference("right_hand");
+    if (!leftDefaultReference || !rightDefaultReference) {
+      throw std::runtime_error("Hand-pose random generation requires left_hand and right_hand task-space pose references.");
+    }
+    const auto handPoseRandomConfig = loadHandPoseRandomConfig(options.referenceFile);
+    const scalar_t manipulationProbability =
+        options.manipulationProbabilityOverridden ? options.manipulationProbability : handPoseRandomConfig.manipulationProbability;
+    modeSchedule = makeRandomModeSchedule(options.duration, options.modeSegmentMin, options.modeSegmentMax, manipulationProbability, rng);
+    handPoseTrajectories =
+        makeRandomHandPoseTrajectories(options, modeSchedule, handPoseRandomConfig, *leftDefaultReference, *rightDefaultReference, rng);
+    std::cout << "[random_mpc_generator] hand-pose mode enabled: height fixed at " << defaultBaseHeight
+              << ", manipulation probability " << manipulationProbability
+              << (options.saveAdditionalInfo ? ", sampled targets will be stored in NPZ command arrays.\n" : ".\n");
+  } else {
+    modeSchedule = makeRandomModeSchedule(options.duration, options.modeSegmentMin, options.modeSegmentMax, options.manipulationProbability, rng);
+  }
 
   const auto gaitMap = getGaitMap(options.gaitFile);
   const std::vector<ProceduralMpcMotionManager::GaitModeStateConfig> gaitModeStates{
@@ -1020,9 +1487,12 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
       sampledMpcJointState[jointIndex] = trajectory.value(time);
     }
 
-    const bool forceStance = stanceSchedule.value(time);
+    const HandPoseRandomMode randomMode = options.handPoseMode ? modeSchedule.value(time) : HandPoseRandomMode::WALKING;
+    const bool forceStance =
+        options.handPoseMode ? (randomMode == HandPoseRandomMode::MANIPULATION) : stanceSchedule.value(time);
     vector4_t velocityTarget;
-    velocityTarget << vxTrajectory.value(time), vyTrajectory.value(time), heightTrajectory.value(time), yawRateTrajectory.value(time);
+    velocityTarget << vxTrajectory.value(time), vyTrajectory.value(time),
+        (options.handPoseMode ? defaultBaseHeight : heightTrajectory.value(time)), yawRateTrajectory.value(time);
     if (forceStance) {
       velocityTarget[0] = 0.0;
       velocityTarget[1] = 0.0;
@@ -1048,6 +1518,16 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
     filteredCommand.desired_waist_yaw = sampledMpcJointState[waistYawJointIndex];
     filteredCommand.desired_waist_roll = sampledMpcJointState[waistRollJointIndex];
     filteredCommand.desired_waist_pitch = sampledMpcJointState[waistPitchJointIndex];
+
+    HandPoseReference leftCommandReference;
+    HandPoseReference rightCommandReference;
+    if (options.handPoseMode) {
+      leftCommandReference = handPoseTrajectories->left.value(time);
+      rightCommandReference = handPoseTrajectories->right.value(time);
+      handPoseReferenceManagerPtr->setReference("left_hand", leftCommandReference, 0.0);
+      handPoseReferenceManagerPtr->setReference("right_hand", rightCommandReference, 0.0);
+    }
+
     const vector6_t baseVelocity = mpcRobotModel.getBaseComVelocity(observation.state);
     auto currentCfg = gaitModeStates[currentGaitMode];
 
@@ -1115,6 +1595,9 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
     appendBodyPoses(buffers, fullModel, fullData, bodyFrameIds, mpcRobotModel.getBasePose(observation.state), fullJointPos);
     appendContactData(buffers, mpcRobotModel, observation.input,
                       interface.getSwitchedModelReferenceManagerPtr()->getContactFlags(observation.time));
+    if (options.handPoseMode && options.saveAdditionalInfo) {
+      appendHandPoseCommandTargets(buffers, filteredCommand.toVector(), leftCommandReference, rightCommandReference, randomMode);
+    }
     ++buffers.numFrames;
 
     if (frame % 25 == 0) {

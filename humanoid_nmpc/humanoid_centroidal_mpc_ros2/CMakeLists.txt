@@ -181,6 +181,19 @@ target_link_libraries(humanoid_centroidal_mpc_random_reference_generator
 )
 target_compile_options(humanoid_centroidal_mpc_random_reference_generator PUBLIC ${FLAGS})
 
+# Headless random hand-pose MPC reference generator
+add_executable(humanoid_centroidal_mpc_random_hand_pose_generator
+  src/CentroidalMpcRandomReferenceGenerator.cpp
+)
+ament_target_dependencies(humanoid_centroidal_mpc_random_hand_pose_generator
+  ${dependencies}
+)
+target_link_libraries(humanoid_centroidal_mpc_random_hand_pose_generator
+  ZLIB::ZLIB
+)
+target_compile_definitions(humanoid_centroidal_mpc_random_hand_pose_generator PRIVATE HAND_POSE_RANDOM_GENERATOR)
+target_compile_options(humanoid_centroidal_mpc_random_hand_pose_generator PUBLIC ${FLAGS})
+
 # Pose Command Node
 add_executable(humanoid_centroidal_mpc_pose_command_node
   src/CentroidalMpcKeyboardPoseCommandNode.cpp
@@ -233,6 +246,7 @@ install(TARGETS
   humanoid_centroidal_mpc_reference_joint_state_node
   humanoid_centroidal_mpc_motion_reference_node
   humanoid_centroidal_mpc_random_reference_generator
+  humanoid_centroidal_mpc_random_hand_pose_generator
   humanoid_centroidal_mpc_pose_command_node
   DESTINATION lib/${PROJECT_NAME}
 )
