@@ -1329,6 +1329,7 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
 
   SqpMpc mpc(interface.mpcSettings(), interface.sqpSettings(), interface.getOptimalControlProblem(), interface.getInitializer());
   mpc.getSolverPtr()->setReferenceManager(interface.getReferenceManagerPtr());
+  mpc.getSolverPtr()->addSynchronizedModule(interface.getInputRateSynchronizedModule());
   MPC_MRT_Interface mrt(mpc);
   mrt.initRollout(&interface.getRollout());
 

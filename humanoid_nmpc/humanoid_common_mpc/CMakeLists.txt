@@ -13,6 +13,7 @@ find_package(ament_index_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(ocs2_core REQUIRED)
 find_package(ocs2_mpc REQUIRED)
+find_package(ocs2_oc REQUIRED)
 find_package(ocs2_pinocchio_interface REQUIRED)
 find_package(humanoid_mpc_msgs REQUIRED)
 
@@ -54,6 +55,7 @@ set(dependencies
         rclcpp
         ocs2_core
         ocs2_mpc
+        ocs2_oc
         ocs2_pinocchio_interface
         humanoid_mpc_msgs
 )
@@ -86,6 +88,7 @@ add_library(${PROJECT_NAME}
         src/constraint/ContactMomentXYConstraintCppAd.cpp
         src/constraint/EndEffectorKinematicsLinearVelConstraint.cpp
         src/cost/StateInputQuadraticCost.cpp
+        src/cost/InputRateCost.cpp
         src/cost/EndEffectorKinematicCostHelpers.cpp
         src/cost/EndEffectorKinematicsQuadraticCost.cpp
         src/cost/ExternalTorqueQuadraticCostAD.cpp

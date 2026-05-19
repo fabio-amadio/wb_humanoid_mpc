@@ -44,6 +44,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "humanoid_centroidal_mpc/common/CentroidalMpcRobotModel.h"
 #include "humanoid_centroidal_mpc/initialization/CentroidalWeightCompInitializer.h"
 #include "humanoid_common_mpc/common/ModelSettings.h"
+#include "humanoid_common_mpc/cost/InputRateCost.h"
 #include "humanoid_common_mpc/reference_manager/ProceduralMpcMotionManager.h"
 #include "humanoid_common_mpc/reference_manager/SwitchedModelReferenceManager.h"
 
@@ -86,6 +87,7 @@ class CentroidalMpcInterface final : public RobotInterface {
 
   const CentroidalMpcRobotModel<scalar_t>& getMpcRobotModel() const { return *mpcRobotModelPtr_; }
   const CentroidalMpcRobotModel<ad_scalar_t>& getMpcRobotModelAD() const { return *mpcRobotModelADPtr_; }
+  std::shared_ptr<SolverSynchronizedModule> getInputRateSynchronizedModule() const { return inputRateReferencePtr_; }
 
   std::vector<std::string> getCostNames() const;
   std::vector<std::string> getTerminalCostNames() const;
@@ -115,6 +117,7 @@ class CentroidalMpcInterface final : public RobotInterface {
 
   std::unique_ptr<OptimalControlProblem> problemPtr_;
   std::shared_ptr<SwitchedModelReferenceManager> referenceManagerPtr_;
+  std::shared_ptr<InputRateReference> inputRateReferencePtr_;
 
   std::unique_ptr<CentroidalMpcRobotModel<scalar_t>> mpcRobotModelPtr_;
   std::unique_ptr<CentroidalMpcRobotModel<ad_scalar_t>> mpcRobotModelADPtr_;

@@ -136,6 +136,7 @@ CentroidalMpcInterface::CentroidalMpcInterface(const std::string& taskFile,
       std::make_shared<SwitchedModelReferenceManager>(GaitSchedule::loadGaitSchedule(referenceFile, modelSettings_, verbose_),
                                                       std::move(swingTrajectoryPlanner), *pinocchioInterfacePtr_, *mpcRobotModelPtr_);
   referenceManagerPtr_->setArmSwingReferenceActive(modelSettings_.armSwingReferenceActive);
+  inputRateReferencePtr_ = std::make_shared<InputRateReference>();
 
   // initial state
   initialState_.setZero(centroidalModelInfo_.stateDim);
@@ -167,6 +168,11 @@ void CentroidalMpcInterface::setupOptimalControlProblem() {
 
   // Cost terms
   problemPtr_->costPtr->add("stateInputQuadraticCost", factory.getStateInputQuadraticCost());
+  const auto inputRateCostConfig =
+      InputRateCost::loadConfig(taskFile_, "input_rate_cost.", centroidalModelInfo_.inputDim, verbose_);
+  if (inputRateCostConfig.active && inputRateCostConfig.weights.squaredNorm() > 0.0) {
+    problemPtr_->costPtr->add("inputRateCost", std::make_unique<InputRateCost>(std::move(inputRateCostConfig.weights), inputRateReferencePtr_));
+  }
   problemPtr_->finalCostPtr->add("terminalCost", factory.getTerminalCost());
 
   std::unique_ptr<EndEffectorKinematics<scalar_t>> eeKinematicsPtr;

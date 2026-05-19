@@ -85,6 +85,7 @@ int main(int argc, char** argv) {
   ros2ProceduralMpcMotionManager->subscribe(nodeHandle, qos);
 
   mpc.getSolverPtr()->setReferenceManager(interface.getReferenceManagerPtr());
+  mpc.getSolverPtr()->addSynchronizedModule(interface.getInputRateSynchronizedModule());
   mpc.getSolverPtr()->addSynchronizedModule(ros2ProceduralMpcMotionManager);
 
   MPC_ROS_Interface mpcNode(mpc, robotName);
