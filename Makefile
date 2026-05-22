@@ -12,6 +12,7 @@ CCACHE_DIR := $(build_dir)/.ccache
 
 ros_source_file := /bin/ros_setup.sh
 GENERATOR_ARGS ?=
+MPC_MOTION_REFERENCE_TYPE ?= joint_pos
 ROS_DISTRO ?= humble
 
 ifeq ("$(wildcard $(ros_source_file))","")
@@ -197,13 +198,13 @@ launch-g1-dummy-sim-locomotion-pub-mpc-motion-ref:
 	cd ${build_dir} && \
 	source ${ros_source_file} && \
 	source install/setup.bash && \
-	ros2 launch g1_centroidal_mpc dummy_sim.launch.py publish_mpc_motion_reference:=true
+	ros2 launch g1_centroidal_mpc dummy_sim.launch.py publish_mpc_motion_reference:=true mpc_motion_reference_type:=$(MPC_MOTION_REFERENCE_TYPE)
 
 launch-g1-dummy-sim-locomotion-pub-mpc-future-motion-ref:
 	cd ${build_dir} && \
 	source ${ros_source_file} && \
 	source install/setup.bash && \
-	ros2 launch g1_centroidal_mpc dummy_sim.launch.py publish_mpc_future_motion_reference:=true
+	ros2 launch g1_centroidal_mpc dummy_sim.launch.py publish_mpc_future_motion_reference:=true mpc_motion_reference_type:=$(MPC_MOTION_REFERENCE_TYPE)
 
 launch-g1-dummy-sim-hand-pose:
 	cd ${build_dir} && \
@@ -221,19 +222,19 @@ launch-g1-dummy-sim-teleop-pub-mpc-motion-ref:
 	cd ${build_dir} && \
 	source ${ros_source_file} && \
 	source install/setup.bash && \
-	ros2 launch g1_centroidal_mpc dummy_sim_hands_cartesian.launch.py enable_hand_interactive_markers:=false enable_gui_control:=false enable_vive_walking_command_publisher:=true publish_mpc_motion_reference:=true
+	ros2 launch g1_centroidal_mpc dummy_sim_hands_cartesian.launch.py enable_hand_interactive_markers:=false enable_gui_control:=false enable_vive_walking_command_publisher:=true publish_mpc_motion_reference:=true mpc_motion_reference_type:=$(MPC_MOTION_REFERENCE_TYPE)
 
 launch-g1-dummy-sim-hand-pose-pub-mpc-motion-ref:
 	cd ${build_dir} && \
 	source ${ros_source_file} && \
 	source install/setup.bash && \
-	ros2 launch g1_centroidal_mpc dummy_sim_hands_cartesian.launch.py publish_mpc_motion_reference:=true
+	ros2 launch g1_centroidal_mpc dummy_sim_hands_cartesian.launch.py publish_mpc_motion_reference:=true mpc_motion_reference_type:=$(MPC_MOTION_REFERENCE_TYPE)
 
 launch-g1-dummy-sim-hand-pose-pub-mpc-future-motion-ref:
 	cd ${build_dir} && \
 	source ${ros_source_file} && \
 	source install/setup.bash && \
-	ros2 launch g1_centroidal_mpc dummy_sim_hands_cartesian.launch.py publish_mpc_future_motion_reference:=true
+	ros2 launch g1_centroidal_mpc dummy_sim_hands_cartesian.launch.py publish_mpc_future_motion_reference:=true mpc_motion_reference_type:=$(MPC_MOTION_REFERENCE_TYPE)
 
 generate-g1-random-mpc-npz:
 	cd ${build_dir} && \

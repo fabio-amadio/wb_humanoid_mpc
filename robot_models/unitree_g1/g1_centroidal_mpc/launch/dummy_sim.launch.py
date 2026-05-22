@@ -60,6 +60,13 @@ def generate_launch_description():
             description="Publish MPC references in the CLAMP motion command layout.",
         )
     )
+    cfg.ld.add_action(
+        DeclareLaunchArgument(
+            "mpc_motion_reference_type",
+            default_value="joint_pos",
+            description="Compact MPC motion reference type: `joint_pos` or `joint_state`.",
+        )
+    )
 
     mpc_motion_reference_publisher_node = Node(
         package="humanoid_centroidal_mpc_ros2",
@@ -71,6 +78,8 @@ def generate_launch_description():
             LaunchConfiguration("config_name"),
             LaunchConfiguration("target_command_file"),
             LaunchConfiguration("description_name"),
+            "--motion-reference-type",
+            LaunchConfiguration("mpc_motion_reference_type"),
         ],
         condition=IfCondition(LaunchConfiguration("publish_mpc_motion_reference")),
     )
@@ -94,6 +103,8 @@ def generate_launch_description():
             LaunchConfiguration("target_command_file"),
             LaunchConfiguration("description_name"),
             "--publish-future-motion-ref",
+            "--motion-reference-type",
+            LaunchConfiguration("mpc_motion_reference_type"),
         ],
         condition=IfCondition(
             LaunchConfiguration("publish_mpc_future_motion_reference")

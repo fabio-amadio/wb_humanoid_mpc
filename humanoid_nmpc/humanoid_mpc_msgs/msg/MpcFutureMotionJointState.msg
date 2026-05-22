@@ -6,7 +6,7 @@ int32[] steps
 # Step duration used to convert steps into seconds.
 float32 dt
 
-# Step-major compact JointRefAnchorRpMotionCommand layout:
+# Step-major compact motion command with joint velocities:
 # [step0, step1, ...], each step encoded as
 # [joint_pos, joint_vel, base_linear_velocity_x_body, base_linear_velocity_y_body,
 #  base_yaw_rate_body, base_height_world, base_roll, base_pitch]

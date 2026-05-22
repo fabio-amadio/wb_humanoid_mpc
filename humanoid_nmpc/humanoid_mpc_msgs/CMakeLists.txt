@@ -23,8 +23,10 @@ find_package(unique_identifier_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/WalkingVelocityCommand.idl"
-  "msg/MpcMotionReference.msg"
-  "msg/MpcFutureMotionReference.msg"
+  "msg/MpcMotionJointPos.msg"
+  "msg/MpcMotionJointState.msg"
+  "msg/MpcFutureMotionJointPos.msg"
+  "msg/MpcFutureMotionJointState.msg"
     
   DEPENDENCIES rcl_interfaces builtin_interfaces geometry_msgs std_msgs unique_identifier_msgs
   ADD_LINTER_TESTS

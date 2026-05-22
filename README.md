@@ -168,50 +168,70 @@ The walking-velocity mapping from the Vive controllers is:
 
 ## MPC Motion Reference Export
 
-The centroidal MPC can be used to generate motion references for RL-based tracking policies such as [**YAHMP**](https://github.com/hucebot/yahmp).
+The centroidal MPC can publish compact motion references for downstream tracking policies such as [**YAHMP**](https://github.com/hucebot/yahmp). The payload is always a flattened `float32[] motion_cmd`; only the payload layout changes.
 
-To publish the motion reference computed by the MPC for downstream consumers:
+By default, the exported command contains joint positions and base motion:
 
-```bash
-make launch-g1-dummy-sim-locomotion-pub-mpc-motion-ref
+```text
+[joint_pos, base_vx_body, base_vy_body, base_yaw_rate_body, base_height, base_roll, base_pitch]
 ```
 
-or, with the hand-pose task:
+This uses:
+
+- `humanoid_mpc_msgs/msg/MpcMotionJointPos` for the current reference
+- `humanoid_mpc_msgs/msg/MpcFutureMotionJointPos` for the future reference
+
+To switch from the default position-only message to the joint-state message, set:
 
 ```bash
-make launch-g1-dummy-sim-hand-pose-pub-mpc-motion-ref
+MPC_MOTION_REFERENCE_TYPE=joint_state
 ```
 
-This publishes `/g1/mpc_motion_reference`, which contains:
+for Make targets, or pass this launch argument directly:
 
-- named joint position and velocity references
-- root pose and twist in world
-- a flattened motion-command layout
+```bash
+mpc_motion_reference_type:=joint_state
+```
 
-The flattened command layout matches the one adopted by [**YAHMP**](https://github.com/hucebot/yahmp):
+The joint-state layout includes joint velocities:
 
 ```text
 [joint_pos, joint_vel, base_vx_body, base_vy_body, base_yaw_rate_body, base_height, base_roll, base_pitch]
 ```
 
-To publish compact motion references with the current step plus future steps:
+This uses the matching `MpcMotionJointState` and `MpcFutureMotionJointState` messages.
+
+To switch back to the lightweight default, use `joint_pos`.
+
+To publish the current MPC reference on `/g1/mpc_motion_reference`:
+
+```bash
+make launch-g1-dummy-sim-locomotion-pub-mpc-motion-ref
+```
+
+or with the hand-pose task:
+
+```bash
+make launch-g1-dummy-sim-hand-pose-pub-mpc-motion-ref
+```
+
+To publish the current reference plus future samples on `/g1/mpc_future_motion_reference`:
 
 ```bash
 make launch-g1-dummy-sim-locomotion-pub-mpc-future-motion-ref
 ```
 
-or, with the hand-pose task:
+or with the hand-pose task:
 
 ```bash
 make launch-g1-dummy-sim-hand-pose-pub-mpc-future-motion-ref
 ```
 
-This publishes `/g1/mpc_future_motion_reference`, which contains:
+The future message adds:
 
-- `header`
 - `steps`: YAHMP-Future step offsets, currently `[0, 4, 8, ..., 48]`
 - `dt`: the YAHMP control step, currently `0.02 s`
-- `motion_cmd`: a step-major concatenation of the compact layout above, one block per listed step
+- `motion_cmd`: one selected-layout block per future step, concatenated in step-major order
 
 ## Deployment via HURo
 
