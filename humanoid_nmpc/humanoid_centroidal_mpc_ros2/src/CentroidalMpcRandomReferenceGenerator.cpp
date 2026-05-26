@@ -180,7 +180,7 @@ struct Options {
   scalar_t modeSegmentMax = 8.0;
   scalar_t handHoldPreviousValueProbability = 0.15;
   scalar_t minimumHandSeparation = 0.10;
-  scalar_t basicPrimitiveMinSpeedRatio = 0.25;
+  scalar_t basicPrimitiveMinSpeedRatio = 0.60;
   bool saveAdditionalInfo = false;
   BasicPrimitive basicPrimitive = BasicPrimitive::RANDOM;
 };

@@ -283,7 +283,7 @@ To generate a named locomotion primitive instead of fully random commands, pass 
 make generate-g1-random-mpc-npz GENERATOR_ARGS="--basic-primitive walk_forward"
 ```
 
-Available primitives are `stand`, `walk_forward`, `walk_backward`, `walk_left`, `walk_right`, `turn_left`, `turn_right`, `walk_forward_turn_left`, and `walk_forward_turn_right`. Primitive commands are smoothly resampled only along the selected axis or axes, between a nonzero minimum and the configured maximum velocity. The default minimum is 25% of the axis maximum; tune it with `--basic-primitive-min-speed-ratio`.
+Available primitives are `stand`, `walk_forward`, `walk_backward`, `walk_left`, `walk_right`, `turn_left`, `turn_right`, `walk_forward_turn_left`, and `walk_forward_turn_right`. Primitive commands are smoothly resampled only along the selected axis or axes, between a nonzero minimum and the configured maximum velocity. The default minimum is 60% of the axis maximum; tune it with `--basic-primitive-min-speed-ratio`.
 
 For tuning the random generator, start from:
 
