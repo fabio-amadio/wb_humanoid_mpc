@@ -222,7 +222,7 @@ Q
 ; control weight matrix
 R
 {
-  scaling 1e-3
+  scaling 1e-2
 
   ;; Feet Contact Forces: [LF, RF, LH, RH] ;;
   (0,0)   0.05       ; left_force_x
@@ -254,20 +254,55 @@ R
   (24,24) 2000.0      ;    waist_yaw_joint
   (25,25) 800.0      ;    waist_roll_joint
   (26,26) 2000.0      ;    waist_pitch_joint
-  (27,27) 200.0      ;    left_shoulder_pitch_joint
-  (28,28) 100.0      ;    left_shoulder_roll_joint
-  (29,29) 100.0      ;    left_shoulder_yaw_joint
-  (30,30) 200.0      ;    left_elbow_joint
-  (31,31) 100.0      ;    left_wrist_roll_joint
-  (32,32) 100.0      ;    left_wrist_pitch_joint
-  (33,33) 100.0      ;    left_wrist_yaw_joint
-  (34,34) 200.0      ;    right_shoulder_pitch_joint
-  (35,35) 100.0      ;    right_shoulder_roll_joint
-  (36,36) 100.0      ;    right_shoulder_yaw_joint
-  (37,37) 200.0      ;    right_elbow_joint
-  (38,38) 100.0      ;    right_wrist_roll_joint
-  (39,39) 100.0      ;    right_wrist_pitch_joint
-  (40,40) 100.0      ;    right_wrist_yaw_joint
+  (27,27) 10.0      ;    left_shoulder_pitch_joint
+  (28,28) 10.0      ;    left_shoulder_roll_joint
+  (29,29) 10.0      ;    left_shoulder_yaw_joint
+  (30,30) 10.0      ;    left_elbow_joint
+  (31,31) 10.0      ;    left_wrist_roll_joint
+  (32,32) 10.0      ;    left_wrist_pitch_joint
+  (33,33) 10.0      ;    left_wrist_yaw_joint
+  (34,34) 10.0      ;    right_shoulder_pitch_joint
+  (35,35) 10.0      ;    right_shoulder_roll_joint
+  (36,36) 10.0      ;    right_shoulder_yaw_joint
+  (37,37) 10.0      ;    right_elbow_joint
+  (38,38) 10.0      ;    right_wrist_roll_joint
+  (39,39) 10.0      ;    right_wrist_pitch_joint
+  (40,40) 10.0      ;    right_wrist_yaw_joint
+}
+
+; Input smoothing weight matrix.
+; Penalizes deviation from the previous optimized MPC input trajectory.
+; Since centroidal inputs include joint velocities, this acts as a joint-velocity rate regularizer.
+input_rate_cost
+{
+  active true
+  weights
+  {
+    scaling 1e-3
+
+    ;; Waist joint velocities ;;
+    (24,24) 5.0      ;    waist_yaw_joint
+    (25,25) 5.0      ;    waist_roll_joint
+    (26,26) 5.0      ;    waist_pitch_joint
+
+    ;; Left arm joint velocities ;;
+    (27,27) 5.0      ;    left_shoulder_pitch_joint
+    (28,28) 5.0      ;    left_shoulder_roll_joint
+    (29,29) 5.0      ;    left_shoulder_yaw_joint
+    (30,30) 5.0      ;    left_elbow_joint
+    (31,31) 10.0     ;    left_wrist_roll_joint
+    (32,32) 10.0     ;    left_wrist_pitch_joint
+    (33,33) 10.0     ;    left_wrist_yaw_joint
+
+    ;; Right arm joint velocities ;;
+    (34,34) 5.0      ;    right_shoulder_pitch_joint
+    (35,35) 5.0      ;    right_shoulder_roll_joint
+    (36,36) 5.0      ;    right_shoulder_yaw_joint
+    (37,37) 5.0      ;    right_elbow_joint
+    (38,38) 10.0     ;    right_wrist_roll_joint
+    (39,39) 10.0     ;    right_wrist_pitch_joint
+    (40,40) 10.0     ;    right_wrist_yaw_joint
+  }
 }
 
 terminalCostScaling       3.0

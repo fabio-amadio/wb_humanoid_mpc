@@ -118,6 +118,21 @@ constexpr std::array<const char*, 30> kClampBodyNames = {
     "right_wrist_yaw_link",
 };
 
+enum class BasicPrimitive {
+  RANDOM,
+  STAND,
+  WALK_FORWARD,
+  WALK_BACKWARD,
+  WALK_LEFT,
+  WALK_RIGHT,
+  TURN_LEFT,
+  TURN_RIGHT,
+  WALK_FORWARD_TURN_LEFT,
+  WALK_FORWARD_TURN_RIGHT,
+};
+
+const char* basicPrimitiveName(BasicPrimitive primitive);
+
 struct Options {
   std::string taskFile;
   std::string referenceFile;
@@ -165,7 +180,9 @@ struct Options {
   scalar_t modeSegmentMax = 8.0;
   scalar_t handHoldPreviousValueProbability = 0.15;
   scalar_t minimumHandSeparation = 0.10;
+  scalar_t basicPrimitiveMinSpeedRatio = 0.25;
   bool saveAdditionalInfo = false;
+  BasicPrimitive basicPrimitive = BasicPrimitive::RANDOM;
 };
 
 struct SmoothScalarTrajectory {
@@ -312,6 +329,15 @@ struct SmoothHandPoseTrajectory {
     return reference;
   }
 };
+
+SmoothHandPoseTrajectory makeConstantHandPoseTrajectory(scalar_t duration, const HandPoseReference& reference) {
+  SmoothHandPoseTrajectory trajectory;
+  trajectory.position.times = {0.0, duration};
+  trajectory.position.values = {reference.positionInReferenceFrame, reference.positionInReferenceFrame};
+  trajectory.orientation.times = {0.0, duration};
+  trajectory.orientation.values = {reference.orientationReferenceToHand, reference.orientationReferenceToHand};
+  return trajectory;
+}
 
 struct HandPoseRandomConfig {
   HandPoseBounds manipulationLeft;
@@ -599,6 +625,42 @@ scalar_t parseScalar(const std::string& text, const std::string& option) {
   }
 }
 
+BasicPrimitive parseBasicPrimitive(const std::string& text) {
+  if (text == "random") {
+    return BasicPrimitive::RANDOM;
+  }
+  if (text == "stand") {
+    return BasicPrimitive::STAND;
+  }
+  if (text == "walk_forward") {
+    return BasicPrimitive::WALK_FORWARD;
+  }
+  if (text == "walk_backward") {
+    return BasicPrimitive::WALK_BACKWARD;
+  }
+  if (text == "walk_left") {
+    return BasicPrimitive::WALK_LEFT;
+  }
+  if (text == "walk_right") {
+    return BasicPrimitive::WALK_RIGHT;
+  }
+  if (text == "turn_left") {
+    return BasicPrimitive::TURN_LEFT;
+  }
+  if (text == "turn_right") {
+    return BasicPrimitive::TURN_RIGHT;
+  }
+  if (text == "walk_forward_turn_left") {
+    return BasicPrimitive::WALK_FORWARD_TURN_LEFT;
+  }
+  if (text == "walk_forward_turn_right") {
+    return BasicPrimitive::WALK_FORWARD_TURN_RIGHT;
+  }
+  throw std::runtime_error("Unsupported --basic-primitive `" + text +
+                           "`. Expected one of: random, stand, walk_forward, walk_backward, walk_left, walk_right, turn_left, "
+                           "turn_right, walk_forward_turn_left, walk_forward_turn_right.");
+}
+
 void requireOrderedRange(scalar_t lower, scalar_t upper, const std::string& name) {
   if (!std::isfinite(lower) || !std::isfinite(upper) || lower > upper) {
     throw std::runtime_error(name + " must be finite with min <= max.");
@@ -649,6 +711,10 @@ Options parseOptions(int argc, char** argv) {
       options.numMotions = static_cast<size_t>(std::stoul(requireValue(i, argc, argv)));
     } else if (arg == "--max-attempts-per-motion") {
       options.maxAttemptsPerMotion = static_cast<size_t>(std::stoul(requireValue(i, argc, argv)));
+    } else if (arg == "--basic-primitive") {
+      options.basicPrimitive = parseBasicPrimitive(requireValue(i, argc, argv));
+    } else if (arg == "--basic-primitive-min-speed-ratio") {
+      options.basicPrimitiveMinSpeedRatio = parseScalar(requireValue(i, argc, argv), arg);
     } else if (arg == "--vx-min") {
       options.vxMin = parseScalar(requireValue(i, argc, argv), arg);
     } else if (arg == "--vx-max") {
@@ -709,6 +775,9 @@ Options parseOptions(int argc, char** argv) {
     } else if (arg == "--help" || arg == "-h") {
       std::cout << "Usage: " << argv[0] << " [--output PATH] [--duration SEC] [--fps HZ] [--seed N] [--num-motions N]\n"
                 << "       [--max-attempts-per-motion N]\n"
+                << "       [--basic-primitive random|stand|walk_forward|walk_backward|walk_left|walk_right|turn_left|turn_right|\n"
+                << "                          walk_forward_turn_left|walk_forward_turn_right]\n"
+                << "       [--basic-primitive-min-speed-ratio R]\n"
                 << "       [--vx-min V] [--vx-max V] [--vy-min V] [--vy-max V]\n"
                 << "       [--yaw-rate-min V] [--yaw-rate-max V] [--height-min H] [--height-max H]\n"
                 << "       [--base-command-deadband V]\n"
@@ -760,6 +829,9 @@ Options parseOptions(int argc, char** argv) {
   if (options.baseCommandDeadband < 0.0) {
     throw std::runtime_error("--base-command-deadband must be non-negative.");
   }
+  if (options.basicPrimitiveMinSpeedRatio < 0.0 || options.basicPrimitiveMinSpeedRatio > 1.0) {
+    throw std::runtime_error("--basic-primitive-min-speed-ratio must be in [0, 1].");
+  }
   requireOrderedRange(options.vxMin, options.vxMax, "--vx-min/max");
   requireOrderedRange(options.vyMin, options.vyMax, "--vy-min/max");
   requireOrderedRange(options.yawRateMin, options.yawRateMax, "--yaw-rate-min/max");
@@ -776,13 +848,20 @@ Options parseOptions(int argc, char** argv) {
   return options;
 }
 
-std::filesystem::path outputPathForMotion(const std::filesystem::path& requestedOutput, size_t motionIndex, size_t numMotions) {
-  if (numMotions == 1) {
+std::filesystem::path outputPathForMotion(const std::filesystem::path& requestedOutput,
+                                          size_t motionIndex,
+                                          size_t numMotions,
+                                          BasicPrimitive basicPrimitive) {
+  std::ostringstream suffix;
+  if (basicPrimitive != BasicPrimitive::RANDOM) {
+    suffix << "_" << basicPrimitiveName(basicPrimitive);
+  }
+  if (numMotions > 1) {
+    suffix << "_" << std::setw(4) << std::setfill('0') << motionIndex;
+  }
+  if (suffix.str().empty()) {
     return requestedOutput;
   }
-
-  std::ostringstream suffix;
-  suffix << "_" << std::setw(4) << std::setfill('0') << motionIndex;
 
   if (requestedOutput.has_extension()) {
     return requestedOutput.parent_path() / (requestedOutput.stem().string() + suffix.str() + requestedOutput.extension().string());
@@ -833,6 +912,13 @@ SmoothScalarTrajectory makeRandomSmoothTrajectory(scalar_t duration,
   return trajectory;
 }
 
+SmoothScalarTrajectory makeConstantTrajectory(scalar_t duration, scalar_t value) {
+  SmoothScalarTrajectory trajectory;
+  trajectory.times = {0.0, duration};
+  trajectory.values = {value, value};
+  return trajectory;
+}
+
 StanceSchedule makeRandomStanceSchedule(
     scalar_t duration, scalar_t segmentMin, scalar_t segmentMax, scalar_t stanceProbability, std::mt19937& rng) {
   std::uniform_real_distribution<scalar_t> segmentDist(segmentMin, segmentMax);
@@ -877,6 +963,21 @@ HeadingSchedule makeRandomHeadingSchedule(scalar_t duration,
   return schedule;
 }
 
+StanceSchedule makeConstantStanceSchedule(scalar_t duration, bool stance) {
+  StanceSchedule schedule;
+  schedule.times = {0.0, duration};
+  schedule.values = {stance, stance};
+  return schedule;
+}
+
+HeadingSchedule makeInactiveHeadingSchedule(scalar_t duration) {
+  HeadingSchedule schedule;
+  schedule.times = {0.0, duration};
+  schedule.active = {false, false};
+  schedule.targets = {0.0, 0.0};
+  return schedule;
+}
+
 ModeSchedule makeRandomModeSchedule(scalar_t duration,
                                     scalar_t segmentMin,
                                     scalar_t segmentMax,
@@ -896,6 +997,121 @@ ModeSchedule makeRandomModeSchedule(scalar_t duration,
     schedule.values.push_back(manipulationDist(rng) ? HandPoseRandomMode::MANIPULATION : HandPoseRandomMode::WALKING);
   }
   return schedule;
+}
+
+ModeSchedule makeConstantModeSchedule(scalar_t duration, HandPoseRandomMode mode) {
+  ModeSchedule schedule;
+  schedule.times = {0.0, duration};
+  schedule.values = {mode, mode};
+  return schedule;
+}
+
+SmoothScalarTrajectory makeSignedBasicPrimitiveTrajectory(scalar_t duration,
+                                                          scalar_t segmentMin,
+                                                          scalar_t segmentMax,
+                                                          scalar_t maxAbsValue,
+                                                          scalar_t sign,
+                                                          scalar_t minSpeedRatio,
+                                                          std::mt19937& rng) {
+  if (maxAbsValue <= 0.0 || sign == 0.0) {
+    return makeConstantTrajectory(duration, 0.0);
+  }
+  const scalar_t minAbsValue = std::clamp(minSpeedRatio, scalar_t(0.0), scalar_t(1.0)) * maxAbsValue;
+  const scalar_t signedMin = sign * minAbsValue;
+  const scalar_t signedMax = sign * maxAbsValue;
+  return makeRandomSmoothTrajectory(duration, segmentMin, segmentMax, std::min(signedMin, signedMax), std::max(signedMin, signedMax),
+                                    signedMin, 0.0, rng);
+}
+
+SmoothScalarTrajectory makeZeroBasicPrimitiveTrajectory(scalar_t duration) {
+  return makeConstantTrajectory(duration, 0.0);
+}
+
+std::array<SmoothScalarTrajectory, 3> makeBasicPrimitiveBaseTrajectories(const Options& options, std::mt19937& rng) {
+  scalar_t vxSign = 0.0;
+  scalar_t vySign = 0.0;
+  scalar_t yawRateSign = 0.0;
+  switch (options.basicPrimitive) {
+    case BasicPrimitive::STAND:
+      break;
+    case BasicPrimitive::WALK_FORWARD:
+      vxSign = 1.0;
+      break;
+    case BasicPrimitive::WALK_BACKWARD:
+      vxSign = -1.0;
+      break;
+    case BasicPrimitive::WALK_LEFT:
+      vySign = 1.0;
+      break;
+    case BasicPrimitive::WALK_RIGHT:
+      vySign = -1.0;
+      break;
+    case BasicPrimitive::TURN_LEFT:
+      yawRateSign = 1.0;
+      break;
+    case BasicPrimitive::TURN_RIGHT:
+      yawRateSign = -1.0;
+      break;
+    case BasicPrimitive::WALK_FORWARD_TURN_LEFT:
+      vxSign = 1.0;
+      yawRateSign = 1.0;
+      break;
+    case BasicPrimitive::WALK_FORWARD_TURN_RIGHT:
+      vxSign = 1.0;
+      yawRateSign = -1.0;
+      break;
+    case BasicPrimitive::RANDOM:
+      break;
+  }
+  if (options.basicPrimitive == BasicPrimitive::RANDOM) {
+    throw std::runtime_error("makeBasicPrimitiveBaseTrajectories called with random primitive.");
+  }
+
+  const scalar_t positiveVxMax = std::max<scalar_t>(0.0, options.vxMax);
+  const scalar_t negativeVxMax = std::max<scalar_t>(0.0, -options.vxMin);
+  const scalar_t positiveVyMax = std::max<scalar_t>(0.0, options.vyMax);
+  const scalar_t negativeVyMax = std::max<scalar_t>(0.0, -options.vyMin);
+  const scalar_t positiveYawRateMax = std::max<scalar_t>(0.0, options.yawRateMax);
+  const scalar_t negativeYawRateMax = std::max<scalar_t>(0.0, -options.yawRateMin);
+
+  return {vxSign == 0.0 ? makeZeroBasicPrimitiveTrajectory(options.duration)
+                        : makeSignedBasicPrimitiveTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
+                                                             vxSign > 0.0 ? positiveVxMax : negativeVxMax, vxSign,
+                                                             options.basicPrimitiveMinSpeedRatio, rng),
+          vySign == 0.0 ? makeZeroBasicPrimitiveTrajectory(options.duration)
+                        : makeSignedBasicPrimitiveTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
+                                                             vySign > 0.0 ? positiveVyMax : negativeVyMax, vySign,
+                                                             options.basicPrimitiveMinSpeedRatio, rng),
+          yawRateSign == 0.0 ? makeZeroBasicPrimitiveTrajectory(options.duration)
+                             : makeSignedBasicPrimitiveTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
+                                                                  yawRateSign > 0.0 ? positiveYawRateMax : negativeYawRateMax, yawRateSign,
+                                                                  options.basicPrimitiveMinSpeedRatio, rng)};
+}
+
+const char* basicPrimitiveName(BasicPrimitive primitive) {
+  switch (primitive) {
+    case BasicPrimitive::RANDOM:
+      return "random";
+    case BasicPrimitive::STAND:
+      return "stand";
+    case BasicPrimitive::WALK_FORWARD:
+      return "walk_forward";
+    case BasicPrimitive::WALK_BACKWARD:
+      return "walk_backward";
+    case BasicPrimitive::WALK_LEFT:
+      return "walk_left";
+    case BasicPrimitive::WALK_RIGHT:
+      return "walk_right";
+    case BasicPrimitive::TURN_LEFT:
+      return "turn_left";
+    case BasicPrimitive::TURN_RIGHT:
+      return "turn_right";
+    case BasicPrimitive::WALK_FORWARD_TURN_LEFT:
+      return "walk_forward_turn_left";
+    case BasicPrimitive::WALK_FORWARD_TURN_RIGHT:
+      return "walk_forward_turn_right";
+  }
+  return "unknown";
 }
 
 scalar_t wrapToPi(scalar_t angle) {
@@ -1347,8 +1563,9 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
   pinocchio::Data fullData(fullModel);
 
   const auto randomizedMpcJointIndices = getRandomizedMpcJointIndices(modelSettings);
+  const bool useBasicPrimitive = options.basicPrimitive != BasicPrimitive::RANDOM;
   std::unordered_map<size_t, SmoothScalarTrajectory> jointTrajectories;
-  if (!options.handPoseMode) {
+  if (!options.handPoseMode && !useBasicPrimitive) {
     for (const size_t mpcJointIndex : randomizedMpcJointIndices) {
       const std::string& jointName = modelSettings.mpcModelJointNames[mpcJointIndex];
       const auto [lowerRaw, upperRaw] = getJointLimits(fullModel, jointName);
@@ -1373,18 +1590,29 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
     }
   }
 
-  const auto vxTrajectory = makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax, options.vxMin,
-                                                       options.vxMax, 0.0, 0.0, rng);
-  const auto vyTrajectory = makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax, options.vyMin,
-                                                       options.vyMax, 0.0, 0.0, rng);
-  const auto yawRateTrajectory = makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
-                                                            options.yawRateMin, options.yawRateMax, 0.0, 0.0, rng);
-  const auto heightTrajectory = makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
-                                                           options.heightMin, options.heightMax, defaultBaseHeight, 0.0, rng);
-  const auto stanceSchedule =
-      makeRandomStanceSchedule(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax, options.stanceProbability, rng);
-  const auto headingSchedule = makeRandomHeadingSchedule(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
-                                                         options.headingProbability, options.headingMin, options.headingMax, rng);
+  const auto primitiveTrajectories =
+      useBasicPrimitive ? makeBasicPrimitiveBaseTrajectories(options, rng) : std::array<SmoothScalarTrajectory, 3>{};
+  const auto vxTrajectory = useBasicPrimitive ? primitiveTrajectories[0]
+                                              : makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
+                                                                           options.vxMin, options.vxMax, 0.0, 0.0, rng);
+  const auto vyTrajectory = useBasicPrimitive ? primitiveTrajectories[1]
+                                              : makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
+                                                                           options.vyMin, options.vyMax, 0.0, 0.0, rng);
+  const auto yawRateTrajectory =
+      useBasicPrimitive ? primitiveTrajectories[2]
+                        : makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax, options.yawRateMin,
+                                                     options.yawRateMax, 0.0, 0.0, rng);
+  const auto heightTrajectory = useBasicPrimitive ? makeConstantTrajectory(options.duration, defaultBaseHeight)
+                                                  : makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin,
+                                                                               options.cmdVelSegmentMax, options.heightMin, options.heightMax,
+                                                                               defaultBaseHeight, 0.0, rng);
+  const auto stanceSchedule = useBasicPrimitive ? makeConstantStanceSchedule(options.duration, options.basicPrimitive == BasicPrimitive::STAND)
+                                                : makeRandomStanceSchedule(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
+                                                                           options.stanceProbability, rng);
+  const auto headingSchedule =
+      useBasicPrimitive ? makeInactiveHeadingSchedule(options.duration)
+                        : makeRandomHeadingSchedule(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax, options.headingProbability,
+                                                    options.headingMin, options.headingMax, rng);
 
   std::optional<HandPoseTrajectoryPair> handPoseTrajectories;
   ModeSchedule modeSchedule;
@@ -1397,14 +1625,28 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
     const auto handPoseRandomConfig = loadHandPoseRandomConfig(options.referenceFile);
     const scalar_t manipulationProbability =
         options.manipulationProbabilityOverridden ? options.manipulationProbability : handPoseRandomConfig.manipulationProbability;
-    modeSchedule = makeRandomModeSchedule(options.duration, options.modeSegmentMin, options.modeSegmentMax, manipulationProbability, rng);
-    handPoseTrajectories =
-        makeRandomHandPoseTrajectories(options, modeSchedule, handPoseRandomConfig, *leftDefaultReference, *rightDefaultReference, rng);
+    modeSchedule = useBasicPrimitive ? makeConstantModeSchedule(options.duration, HandPoseRandomMode::WALKING)
+                                     : makeRandomModeSchedule(options.duration, options.modeSegmentMin, options.modeSegmentMax,
+                                                              manipulationProbability, rng);
+    if (useBasicPrimitive) {
+      handPoseTrajectories =
+          HandPoseTrajectoryPair{makeConstantHandPoseTrajectory(options.duration, *leftDefaultReference),
+                                 makeConstantHandPoseTrajectory(options.duration, *rightDefaultReference)};
+    } else {
+      handPoseTrajectories =
+          makeRandomHandPoseTrajectories(options, modeSchedule, handPoseRandomConfig, *leftDefaultReference, *rightDefaultReference, rng);
+    }
     std::cout << "[random_mpc_generator] hand-pose mode enabled: height fixed at " << defaultBaseHeight
               << ", manipulation probability " << manipulationProbability
               << (options.saveAdditionalInfo ? ", sampled targets will be stored in NPZ command arrays.\n" : ".\n");
   } else {
-    modeSchedule = makeRandomModeSchedule(options.duration, options.modeSegmentMin, options.modeSegmentMax, options.manipulationProbability, rng);
+    modeSchedule = useBasicPrimitive ? makeConstantModeSchedule(options.duration, HandPoseRandomMode::WALKING)
+                                     : makeRandomModeSchedule(options.duration, options.modeSegmentMin, options.modeSegmentMax,
+                                                              options.manipulationProbability, rng);
+  }
+  if (useBasicPrimitive) {
+    std::cout << "[random_mpc_generator] basic primitive `" << basicPrimitiveName(options.basicPrimitive)
+              << "`: sampling selected axes with min speed ratio " << options.basicPrimitiveMinSpeedRatio << "\n";
   }
 
   const auto gaitMap = getGaitMap(options.gaitFile);
@@ -1665,7 +1907,7 @@ int main(int argc, char** argv) {
   std::cout << "[random_mpc_generator] max attempts per motion: " << options.maxAttemptsPerMotion << "\n";
 
   for (size_t motionIndex = 0; motionIndex < options.numMotions; ++motionIndex) {
-    const auto outputPath = outputPathForMotion(options.output, motionIndex, options.numMotions);
+    const auto outputPath = outputPathForMotion(options.output, motionIndex, options.numMotions, options.basicPrimitive);
     bool generated = false;
     for (size_t attemptIndex = 0; attemptIndex < options.maxAttemptsPerMotion; ++attemptIndex) {
       const uint32_t attemptSeed = options.seed + static_cast<uint32_t>(motionIndex * options.maxAttemptsPerMotion + attemptIndex);

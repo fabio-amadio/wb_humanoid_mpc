@@ -277,6 +277,14 @@ The generator samples smooth random trajectories for:
 
 This random-generation task uses the full 29-DOF G1 MPC model.
 
+To generate a named locomotion primitive instead of fully random commands, pass `--basic-primitive`:
+
+```bash
+make generate-g1-random-mpc-npz GENERATOR_ARGS="--basic-primitive walk_forward"
+```
+
+Available primitives are `stand`, `walk_forward`, `walk_backward`, `walk_left`, `walk_right`, `turn_left`, `turn_right`, `walk_forward_turn_left`, and `walk_forward_turn_right`. Primitive commands are smoothly resampled only along the selected axis or axes, between a nonzero minimum and the configured maximum velocity. The default minimum is 25% of the axis maximum; tune it with `--basic-primitive-min-speed-ratio`.
+
 For tuning the random generator, start from:
 
 - random-generation MPC task: [task_random_reference.info](robot_models/unitree_g1/g1_centroidal_mpc/config/mpc/task_random_reference.info)
@@ -302,6 +310,12 @@ The hand-pose generator keeps the pelvis height fixed, samples smooth Cartesian 
 - `walking`: random locomotion command, reduced hand workspace
 
 New hand-pose targets are sampled as bounded local steps from the previous target, then clamped to the configured workspace. This avoids occasional large hand jumps while still exploring the workspace over time. Manipulation resamples hand targets faster than walking by default; tune this with `segment_min`, `segment_max`, and `manipulation_probability` in `reference_random_hand_pose.info`.
+
+The hand-pose generator also supports the same `--basic-primitive` presets. In that mode, the hands stay at the default task references, the pelvis height stays fixed, and only the selected base primitive is commanded:
+
+```bash
+make generate-g1-random-hand-pose-mpc-npz GENERATOR_ARGS="--basic-primitive walk_forward"
+```
 
 By default, the hand-pose NPZ stores only the generated motion. To also store the sampled command targets, run:
 
