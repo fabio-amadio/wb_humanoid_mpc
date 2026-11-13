@@ -28,6 +28,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ****************************************************************************"""
 
 from dataclasses import dataclass
+from math import isfinite
+from time import monotonic
 
 import rclpy
 from rclpy.node import Node
@@ -76,15 +78,14 @@ class ViveWalkingCommandPublisher(Node):
         super().__init__("vive_walking_command_publisher")
 
         self.publisher_rate = self.declare_parameter("publisher_rate", 25.0).value
+        self.command_timeout_s = self.declare_parameter("command_timeout_s", 0.5).value
+        if not isfinite(self.command_timeout_s) or self.command_timeout_s <= 0.0:
+            raise ValueError("command_timeout_s must be finite and positive")
         self.default_base_height = self.declare_parameter(
             "default_base_height", 0.75
         ).value
-        self.pressed_threshold = self.declare_parameter(
-            "pressed_threshold", 0.5
-        ).value
-        self.trackpad_deadband = self.declare_parameter(
-            "trackpad_deadband", 0.35
-        ).value
+        self.pressed_threshold = self.declare_parameter("pressed_threshold", 0.5).value
+        self.trackpad_deadband = self.declare_parameter("trackpad_deadband", 0.35).value
         self.waist_yaw_rate = self.declare_parameter("waist_yaw_rate", 0.8).value
         self.waist_yaw_min = self.declare_parameter(
             "waist_yaw_min", -1.57079632679
@@ -117,20 +118,29 @@ class ViveWalkingCommandPublisher(Node):
         self.left_grip_pressed = False
         self.right_grip_pressed = False
         self.waist_yaw_reference = 0.0
+        self.left_received_at = None
+        self.right_received_at = None
 
     def left_callback(self, msg: JointState):
         trackpad_x = _joint_value(msg, "trackpad_x")
         trackpad_pressed = _joint_value(msg, "trackpad_pressed")
         grip_pressed = _joint_value_any(msg, self.GRIP_JOINT_NAMES)
 
-        if trackpad_x is None or trackpad_pressed is None:
+        if any(
+            value is None or not isfinite(value)
+            for value in (trackpad_x, trackpad_pressed)
+        ):
+            self.left_trackpad = TrackpadCommand()
+            self.left_grip_pressed = False
+            self.left_received_at = None
             self.get_logger().warn(
-                "Missing left Vive joints 'trackpad_x' or 'trackpad_pressed'.",
+                "Missing or non-finite left Vive joints 'trackpad_x' or 'trackpad_pressed'.",
                 throttle_duration_sec=5.0,
             )
             return
 
         self.left_trackpad.x = float(trackpad_x)
+        self.left_received_at = monotonic()
         self.left_trackpad.pressed = float(trackpad_pressed) >= self.pressed_threshold
         self.left_grip_pressed = (
             grip_pressed is not None and float(grip_pressed) >= self.pressed_threshold
@@ -142,23 +152,41 @@ class ViveWalkingCommandPublisher(Node):
         trackpad_pressed = _joint_value(msg, "trackpad_pressed")
         grip_pressed = _joint_value_any(msg, self.GRIP_JOINT_NAMES)
 
-        if trackpad_x is None or trackpad_y is None or trackpad_pressed is None:
+        if any(
+            value is None or not isfinite(value)
+            for value in (trackpad_x, trackpad_y, trackpad_pressed)
+        ):
+            self.right_trackpad = TrackpadCommand()
+            self.right_grip_pressed = False
+            self.right_received_at = None
             self.get_logger().warn(
-                "Missing right Vive joints 'trackpad_x', 'trackpad_y', or 'trackpad_pressed'.",
+                "Missing or non-finite right Vive joints 'trackpad_x', 'trackpad_y', or 'trackpad_pressed'.",
                 throttle_duration_sec=5.0,
             )
             return
 
         self.right_trackpad.x = float(trackpad_x)
+        self.right_received_at = monotonic()
         self.right_trackpad.y = float(trackpad_y)
-        self.right_trackpad.pressed = (
-            float(trackpad_pressed) >= self.pressed_threshold
-        )
+        self.right_trackpad.pressed = float(trackpad_pressed) >= self.pressed_threshold
         self.right_grip_pressed = (
             grip_pressed is not None and float(grip_pressed) >= self.pressed_threshold
         )
 
     def timer_callback(self):
+        now = monotonic()
+        if (
+            self.left_received_at is None
+            or now - self.left_received_at >= self.command_timeout_s
+        ):
+            self.left_trackpad = TrackpadCommand()
+            self.left_grip_pressed = False
+        if (
+            self.right_received_at is None
+            or now - self.right_received_at >= self.command_timeout_s
+        ):
+            self.right_trackpad = TrackpadCommand()
+            self.right_grip_pressed = False
         msg = WalkingVelocityCommand()
 
         if self.right_trackpad.pressed:

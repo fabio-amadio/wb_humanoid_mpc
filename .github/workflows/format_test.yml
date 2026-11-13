@@ -2,9 +2,9 @@ name: Code Format Check
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, future-ref ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ '**' ]
 
 jobs:
   format-check:

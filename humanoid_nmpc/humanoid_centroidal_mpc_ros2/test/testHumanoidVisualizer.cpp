@@ -43,15 +43,15 @@ using namespace ocs2::humanoid;
 int main(int argc, char** argv) {
   std::vector<std::string> programArgs;
   programArgs = rclcpp::remove_ros_arguments(argc, argv);
-  if (programArgs.size() < 5) {
+  if (programArgs.size() < 6) {
     throw std::runtime_error("No robot name, config folder, target command file, or description name specified. Aborting.");
   }
 
-  const std::string robotName(argv[1]);
-  const std::string taskFile(argv[2]);
-  const std::string referenceFile(argv[3]);
-  const std::string urdfFile(argv[4]);
-  const std::string gaitFile(argv[5]);
+  const std::string robotName(programArgs[1]);
+  const std::string taskFile(programArgs[2]);
+  const std::string referenceFile(programArgs[3]);
+  const std::string urdfFile(programArgs[4]);
+  const std::string gaitFile(programArgs[5]);
 
   rclcpp::init(argc, argv);
   auto node = std::make_shared<rclcpp::Node>("humanoid_visualizer");

@@ -32,6 +32,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <rclcpp/rclcpp.hpp>
 
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <mutex>
@@ -96,6 +97,8 @@ class Ros2ProceduralMpcMotionManager : public ProceduralMpcMotionManager {
   std::unordered_map<std::string, HandPositionBounds> handPositionBounds_;
   WaistOrientationBounds waistOrientationBounds_;
   scalar_t currentSolverTime_ = 0.0;
+  scalar_t walkingCommandTimeout_ = 0.5;
+  std::chrono::steady_clock::time_point lastWalkingCommandTime_{};
   scalar_t waistOrientationTransitionStartTime_ = 0.0;
   vector3_t waistOrientationStartReference_ = vector3_t::Zero();
   vector3_t waistOrientationGoalReference_ = vector3_t::Zero();

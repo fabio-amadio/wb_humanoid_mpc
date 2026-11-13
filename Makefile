@@ -34,14 +34,14 @@ endef
 define find_ros2_python_packages
 $(shell \
     for dir in $$(find $(1) -mindepth 1 -maxdepth 2 -type d); do \
-        if [ -f "$$dir/setup.py" ] && [ -f "$$dir/package.xml" ] && [[ "$$(basename $$dir)" == *_py ]]; then \
+        if [ -f "$$dir/setup.py" ] && [ -f "$$dir/package.xml" ] && [ ! -f "$$dir/CMakeLists.txt" ]; then \
             basename $$dir; \
         fi; \
     done)
 endef
 
 # Individual package lists from specific subdirectories
-NMPC_PACKAGES := $(call find_ros2_packages,$(current_path)/humanoid_nmpc)
+NMPC_PACKAGES := $(call find_ros2_packages,$(current_path)/humanoid_nmpc) $(call find_ros2_python_packages,$(current_path)/humanoid_nmpc)
 
 ROBOT_MODEL_PACKAGES := $(call find_ros2_packages,$(current_path)/robot_models)
 
@@ -283,4 +283,4 @@ run-mpc-tests:
 	source ${ros_source_file} && \
 	source install/setup.bash && \
 	colcon test --event-handlers console_direct+ --return-code-on-test-failure --packages-select humanoid_common_mpc \
-	humanoid_common_mpc_ros2 humanoid_centroidal_mpc humanoid_centroidal_mpc_ros2
+	humanoid_common_mpc_ros2 humanoid_centroidal_mpc humanoid_centroidal_mpc_ros2 humanoid_centroidal_mpc_test robot_model g1_centroidal_mpc remote_control

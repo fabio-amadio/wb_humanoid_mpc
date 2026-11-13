@@ -2,6 +2,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch.substitutions import Command, LaunchConfiguration
 
 import launch
+import launch_ros
 from humanoid_common_mpc_ros2.mpc_launch_config import MPCLaunchConfig
 
 
@@ -12,13 +13,14 @@ def generate_launch_description():
         mpc_config_pkg="g1_centroidal_mpc",
         mpc_model_pkg="g1_description",
         urdf_rel_path="/urdf/g1_29dof.urdf",
+        xml_rel_path="/urdf/g1_29dof.xml",
         robot_name="g1",
         solver="sqp",
         enable_debug=False,
     )
 
     test_visualizer_node = launch_ros.actions.Node(
-        package="g1_centroidal_mpc_ros2",
+        package="humanoid_centroidal_mpc_ros2",
         executable="test_visualizer",
         name="test_visualizer",
         # prefix=['x-terminal-emulator -e gdb -ex run --args'],
@@ -28,6 +30,7 @@ def generate_launch_description():
             LaunchConfiguration("config_name"),
             LaunchConfiguration("target_command_file"),
             LaunchConfiguration("description_name"),
+            LaunchConfiguration("target_gait_file"),
         ],
     )
 

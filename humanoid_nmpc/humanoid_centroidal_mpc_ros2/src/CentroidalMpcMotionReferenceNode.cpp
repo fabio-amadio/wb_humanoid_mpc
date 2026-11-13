@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <functional>
 #include <iterator>
 #include <memory>
@@ -205,6 +206,13 @@ class CentroidalMpcMotionReferencePublisher {
 
     const auto& policy = policySubscriber_.getPolicy();
     if (policy.timeTrajectory_.empty() || policy.stateTrajectory_.empty() || policy.inputTrajectory_.empty()) {
+      return;
+    }
+
+    if (!std::isfinite(observation.time) || observation.time + kPolicyEvaluationLeadTime < policy.timeTrajectory_.front() ||
+        observation.time > policy.timeTrajectory_.back()) {
+      RCLCPP_WARN_THROTTLE(nodeHandle_->get_logger(), *nodeHandle_->get_clock(), 1000,
+                           "Skipping motion reference: the MPC policy does not cover the current observation time.");
       return;
     }
 

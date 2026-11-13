@@ -5,6 +5,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 import launch_ros
 import launch
+from humanoid_common_mpc_ros2.mpc_launch_config import MPCLaunchConfig
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 from launch.actions import DeclareLaunchArgument
@@ -18,6 +19,7 @@ def generate_launch_description():
         mpc_config_pkg="g1_centroidal_mpc",
         mpc_model_pkg="g1_description",
         urdf_rel_path="/urdf/g1_29dof.urdf",
+        xml_rel_path="/urdf/g1_29dof.xml",
         robot_name="g1",
         solver="sqp",
         enable_debug=False,
@@ -30,4 +32,4 @@ def generate_launch_description():
     # Add nodes
     cfg.ld.add_action(cfg.rviz_node)
 
-    return ld
+    return cfg.ld

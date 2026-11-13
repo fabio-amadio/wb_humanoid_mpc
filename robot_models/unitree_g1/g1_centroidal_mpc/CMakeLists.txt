@@ -74,6 +74,12 @@ target_compile_options(test_pinocchio_model PUBLIC ${FLAGS})
 ## Install ##
 #############
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_launch_descriptions test/test_launch_descriptions.py TIMEOUT 120)
+  ament_add_pytest_test(test_motion_reference_export test/test_motion_reference_export.py TIMEOUT 120)
+endif()
+
 install(TARGETS 
   test_pinocchio_model 
   DESTINATION lib/${PROJECT_NAME}

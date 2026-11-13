@@ -72,19 +72,14 @@ class CentroidalMpcMrtJointController final : public ::robot::model::ControlBase
 
   void startMpcThread(const ::robot::model::RobotState& initRobotState);
 
+  /** Preserve the current configuration and yaw, with zero momentum, roll, pitch and input. */
+  static TargetTrajectories currentObservationToResetTrajectory(const SystemObservation& currentMpcObservation);
+
  private:
   /**
    * Handles the MPC solver thread.
    */
   void solverWorker();
-
-  /**
-   * Method to convert the latest observation msg to a stable desired trajectory (current position, zero velocity and
-   * acceleration)
-   *
-   * @param [in] msg: The observation message.
-   */
-  TargetTrajectories currentObservationToResetTrajectory(const SystemObservation& currentMpcObservation);
 
   void updateMpcState(vector_t& mpcState, const ::robot::model::RobotState& robotState);
   void updateMpcObservation(ocs2::SystemObservation& mpcObservation, const ::robot::model::RobotState& robotState);

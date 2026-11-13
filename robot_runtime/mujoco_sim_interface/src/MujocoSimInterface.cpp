@@ -355,6 +355,7 @@ void MujocoSimInterface::updateMetrics() {
 /******************************************************************************************************/
 
 void MujocoSimInterface::simulationStep() {
+  std::unique_lock<std::mutex> lock(mujocoMutex_);
   threadSafeRobotJointAction_.copy_value(robotJointActionInternal_);
   for (size_t i = 0; i < nActuators_; ++i) {
     joint_index_t idx = activeRobotActuatorIndices_[i];
@@ -363,7 +364,6 @@ void MujocoSimInterface::simulationStep() {
         jointAction.getTotalFeedbackTorque(robotStateInternal_.getJointPosition(idx), robotStateInternal_.getJointVelocity(idx));
   }
 
-  mujocoMutex_.lock();
   mj_step(mujocoModel_, mujocoData_);
   updateThreadSafeRobotState();
   updateMetrics();
@@ -379,11 +379,10 @@ void MujocoSimInterface::simulationStep() {
     simFps_.reset();
     metrics_.reset();
     updateMetrics();
-    mujocoMutex_.unlock();
+    lock.unlock();
     // Sleep to let controller update and adjust;
     std::this_thread::sleep_until(std::chrono::steady_clock::now() + std::chrono::microseconds(1000000));
   }
-  mujocoMutex_.unlock();
 }
 
 /******************************************************************************************************/

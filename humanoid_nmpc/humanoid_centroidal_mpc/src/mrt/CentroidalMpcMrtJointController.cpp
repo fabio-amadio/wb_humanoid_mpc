@@ -52,7 +52,7 @@ CentroidalMpcMrtJointController::CentroidalMpcMrtJointController(const ::robot::
     : mcpMrtInterface_(mpc),
       pinocchioInterface_(pinocchioInterface),
       mpcRobotModelPtr_(mpcRobotModel.clone()),
-      mpcDeltaTMicroSeconds_(1000000 / mpcDesiredFrequency),
+      mpcDeltaTMicroSeconds_(mpcDesiredFrequency > 0 ? 1000000 / mpcDesiredFrequency : 0),
       realtime_(mpcDesiredFrequency <= 0),
       visualizerPtr_(rVizVisualizerPtr),
       inverse_dynamics_kp_(mpcRobotModel.getJointDim()),
@@ -241,7 +241,7 @@ void CentroidalMpcMrtJointController::solverWorker() {
   mcpMrtInterface_.resetMpcNode(currentObservationToResetTrajectory(mcpMrtInterface_.getCurrentObservation()));
   std::cerr << "MPC is reset. NMPC solver started!" << std::endl;
 
-  while (true) {
+  while (!terminateThread_.load()) {
     auto targetTimeForNextIteration = std::chrono::steady_clock::now() + std::chrono::microseconds(mpcDeltaTMicroSeconds_);
 
     mcpMrtInterface_.advanceMpc();
@@ -275,11 +275,11 @@ void CentroidalMpcMrtJointController::solverWorker() {
 TargetTrajectories CentroidalMpcMrtJointController::currentObservationToResetTrajectory(const SystemObservation& currentObservation) {
   vector_t targetState = currentObservation.state;
 
-  // zero out velocities
-  targetState.tail(mpcRobotModelPtr_->getGenCoordinatesDim()) = vector_t::Zero(mpcRobotModelPtr_->getGenCoordinatesDim());
+  // Centroidal state: [normalized momentum (6), base pose (6), joint positions].
+  targetState.head<6>().setZero();
 
   // zero out pitch + roll angles
-  targetState.segment<2>(4) = vector_t::Zero(2);
+  targetState.segment<2>(10).setZero();
 
   const TargetTrajectories resetTargetTrajectories({currentObservation.time}, {targetState},
                                                    {vector_t::Zero(currentObservation.input.size())});

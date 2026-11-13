@@ -54,6 +54,10 @@ Ros2ProceduralMpcMotionManager::Ros2ProceduralMpcMotionManager(
       robotName_(std::move(robotName)) {
   boost::property_tree::ptree pt;
   boost::property_tree::read_info(referenceFile, pt);
+  walkingCommandTimeout_ = pt.get<scalar_t>("walkingCommandTimeout", 0.5);
+  if (!std::isfinite(walkingCommandTimeout_) || walkingCommandTimeout_ <= 0.0) {
+    throw std::invalid_argument("walkingCommandTimeout must be finite and positive.");
+  }
   if (const auto handReferenceTransitionDuration = pt.get_optional<scalar_t>("handReferenceTransitionDuration")) {
     handReferenceTransitionDuration_ = std::max<scalar_t>(*handReferenceTransitionDuration, 0.0);
   }
@@ -105,6 +109,10 @@ Ros2ProceduralMpcMotionManager::Ros2ProceduralMpcMotionManager(
 
 void Ros2ProceduralMpcMotionManager::setAndScaleVelocityCommand(const WalkingVelocityCommand& rawVelocityCommand) {
   std::lock_guard<std::mutex> lock(walkingVelCommandMutex_);
+  if (!rawVelocityCommand.toVector().allFinite() || !rawVelocityCommand.getWaistOrientation().allFinite()) {
+    return;
+  }
+  lastWalkingCommandTime_ = std::chrono::steady_clock::now();
   velocityCommand_ = scaleWalkingVelocityCommand(rawVelocityCommand);
   const vector3_t clampedWaistOrientation = clampWaistOrientation(rawVelocityCommand.getWaistOrientation());
   if (!waistOrientationReferenceInitialized_) {
@@ -207,6 +215,11 @@ WalkingVelocityCommand Ros2ProceduralMpcMotionManager::getScaledWalkingVelocityC
     waistOrientationGoalReference_ = velocityCommand_.getWaistOrientation();
   }
   WalkingVelocityCommand command = velocityCommand_;
+  if (std::chrono::duration<scalar_t>(std::chrono::steady_clock::now() - lastWalkingCommandTime_).count() >= walkingCommandTimeout_) {
+    command.linear_velocity_x = 0.0;
+    command.linear_velocity_y = 0.0;
+    command.angular_velocity_z = 0.0;
+  }
   command.setWaistOrientation(interpolateWaistOrientation(time));
   return command;
 }

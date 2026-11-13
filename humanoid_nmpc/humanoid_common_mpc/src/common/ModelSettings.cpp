@@ -86,8 +86,8 @@ std::vector<size_t> initializeMpcToFullJointIndices(const std::vector<std::strin
   std::unordered_map<std::string, size_t> fullJointIndexMap = createJointIndexMap(fullJointNames);
   std::vector<size_t> mpcModelJointIndices;
   mpcModelJointIndices.reserve(mpcModelJointNames.size());
-  for (size_t i = 0; i < mpcModelJointNames.size(); ++i) {
-    mpcModelJointIndices[i] = fullJointIndexMap[mpcModelJointNames[i]];
+  for (const auto& jointName : mpcModelJointNames) {
+    mpcModelJointIndices.push_back(fullJointIndexMap.at(jointName));
   }
   return mpcModelJointIndices;
 }

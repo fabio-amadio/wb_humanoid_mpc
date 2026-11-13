@@ -12,6 +12,7 @@
   <depend>humanoid_mpc_msgs</depend>
   <depend>sensor_msgs</depend>
   <exec_depend>python3-tk</exec_depend>
+  <test_depend>python3-pytest</test_depend>
 
   <export>
     <build_type>ament_python</build_type>

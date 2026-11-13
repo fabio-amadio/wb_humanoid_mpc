@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - future-ref
   pull_request:
     branches: 
       - '**'
@@ -19,15 +20,15 @@ jobs:
     strategy:
       matrix:
         container:
-          - "ros:jazzy"
+          - "ros:humble-ros-base"
     container: ${{ matrix.container }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Cache APT packages
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: /var/cache/apt
           key: ${{ runner.os }}-apt-${{ hashFiles('dependencies.txt') }}
@@ -36,8 +37,7 @@ jobs:
 
       - name: Install Base Dependencies
         run: |
-          sudo apt-get update && sudo apt-get upgrade -y
-          sudo apt-get update && apt-get install -y --no-install-recommends \
+          apt-get update && apt-get install -y --no-install-recommends \
           curl gnupg2 lsb-release software-properties-common \
           locales \
           git \
@@ -47,7 +47,7 @@ jobs:
 
       - name: Install Project Dependencies
         run: |
-          envsubst < dependencies.txt | xargs sudo apt-get install -y --no-install-recommends
+          envsubst < dependencies.txt | xargs apt-get install -y --no-install-recommends
 
       - name: Initialize submodules
         run: |
@@ -55,7 +55,7 @@ jobs:
           git submodule update --init --recursive
 
       - name: Cache Build Artifacts
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: build/
           key: ${{ runner.os }}-build-${{ hashFiles('**/CMakeLists.txt') }}
@@ -65,4 +65,16 @@ jobs:
       - name: Build All
         run: |
           export PARALLEL_JOBS=1
-          make build-all
+          export CMAKE_BUILD_PARALLEL_LEVEL=1
+          make build_dir="$GITHUB_WORKSPACE" build-all
+
+      - name: Run repository tests
+        run: |
+          make build_dir="$GITHUB_WORKSPACE" test-all
+
+      - name: Report test results
+        if: always()
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon test-result --test-result-base "$GITHUB_WORKSPACE/build" --verbose

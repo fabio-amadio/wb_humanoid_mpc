@@ -150,21 +150,19 @@ To use that teleop setup while also publishing `/g1/mpc_motion_reference` for th
 make launch-g1-dummy-sim-teleop-pub-mpc-motion-ref
 ```
 
-The teleop node subscribes to:
+The Vive walking command node subscribes to:
 
 - `/vive/right/joint_states`
 - `/vive/left/joint_states`
 
-It is launched by the teleop launch variants and publishes over:
-
-- `/g1/left_hand_pose_reference` for the desired left hand pose
-- `/g1/right_hand_pose_reference` for the desired right hand pose
-- `/humanoid/walking_velocity_command` for the desired walking velocity
+It is launched by the teleop launch variants and publishes walking and waist commands on `/humanoid/walking_velocity_command`. Hand-pose references must be provided by the external teleop source.
 
 The walking-velocity mapping from the Vive controllers is:
 
 - from `/vive/right/joint_states`: `trackpad_x` and `trackpad_y` control linear velocity `x/y` only when `trackpad_pressed == 1`
-- from `/vive/left/joint_states`: `trackpad_y` controls yaw velocity only when `trackpad_pressed == 1`
+- from `/vive/left/joint_states`: `trackpad_x` controls yaw velocity only when `trackpad_pressed == 1`
+
+Each controller expires independently after `command_timeout_s` (default `0.5` seconds) without a valid packet. Its walking command and grip-driven waist motion then stop; the current waist reference is held. The MPC command receiver also stops base velocity commands after `walkingCommandTimeout` seconds (default `0.5`, configurable in the reference file) without a valid walking command, while keeping the posture targets.
 
 ## MPC Motion Reference Export
 
@@ -232,6 +230,8 @@ The future message adds:
 - `steps`: YAHMP-Future step offsets, currently `[0, 4, 8, ..., 48]`
 - `dt`: the YAHMP control step, currently `0.02 s`
 - `motion_cmd`: one selected-layout block per future step, concatenated in step-major order
+
+Reference publication stops when the latest policy no longer covers the current observation time, and resumes when a fresh policy arrives. Downstream controllers should handle missing references with their own timeout.
 
 ## Deployment via HURo
 
@@ -359,6 +359,17 @@ Each output gets a numbered suffix such as:
 - `g1_random_hand_pose_mpc_reference_0001.npz`
 
 Use `GENERATOR_ARGS` to pass generator options such as `--duration`, `--fps`, `--seed`, `--num-motions`, or `--save-additional-info`.
+
+## Development Checks
+
+Run builds and tests inside the Docker container:
+
+```bash
+make PARALLEL_JOBS=2 build-all
+make run-mpc-tests
+```
+
+The MPC test target includes robot-model, reset-target, command-timeout, launch-description, and motion-export regression tests. `make test-all` also includes the other repository packages. OCS2's own tests are available separately with `make run-ocs2-tests`.
 
 ## Acknowledgements
 

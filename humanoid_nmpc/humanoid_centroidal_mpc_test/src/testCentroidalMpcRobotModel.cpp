@@ -1,11 +1,15 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Core>
+#include <chrono>
 #include <memory>
+#include <thread>
 
 #include "humanoid_centroidal_mpc/common/CentroidalMpcRobotModel.h"
+#include "humanoid_centroidal_mpc/mrt/CentroidalMpcMrtJointController.h"
 #include "humanoid_common_mpc/common/ModelSettings.h"
 #include "humanoid_common_mpc/common/Types.h"
+#include "humanoid_common_mpc_ros2/ros_comm/Ros2ProceduralMpcMotionManager.h"
 
 #include <ocs2_centroidal_model/CentroidalModelInfo.h>
 #include <ocs2_pinocchio_interface/PinocchioInterface.h>
@@ -64,6 +68,78 @@ class CentroidalMpcRobotModelTest : public ::testing::Test {
 TEST_F(CentroidalMpcRobotModelTest, ConstructorAndDimensions) {
   EXPECT_EQ(testingModelInterface.getMpcRobotModel().getStateDim(), 12 + testingModelInterface.getMpcRobotModel().getJointDim());
   EXPECT_EQ(testingModelInterface.getMpcRobotModel().getInputDim(), 12 + testingModelInterface.getMpcRobotModel().getJointDim());
+}
+
+TEST_F(CentroidalMpcRobotModelTest, ActiveJointMappingMatchesJointNames) {
+  const auto& settings = testingModelInterface.getModelSettings();
+  ASSERT_EQ(settings.mpcModelToFullJointsIndices.size(), settings.mpcModelJointNames.size());
+  for (size_t i = 0; i < settings.mpcModelJointNames.size(); ++i) {
+    const auto fullIndex = settings.mpcModelToFullJointsIndices.at(i);
+    ASSERT_LT(fullIndex, settings.fullJointNames.size());
+    EXPECT_EQ(settings.fullJointNames.at(fullIndex), settings.mpcModelJointNames.at(i));
+  }
+}
+
+TEST_F(CentroidalMpcRobotModelTest, JointConversionPreservesFixedJointsAndRoundTrips) {
+  const auto& settings = testingModelInterface.getModelSettings();
+  const auto& model = testingModelInterface.getMpcRobotModel();
+  ASSERT_EQ(settings.mpcModelToFullJointsIndices.size(), settings.mpcModelJointNames.size());
+  ASSERT_FALSE(settings.fixedJointNames.empty());
+  const vector_t active = vector_t::LinSpaced(settings.mpc_joint_dim, 0.1, 0.9);
+  const vector_t defaults = vector_t::Constant(settings.full_joint_dim, -0.25);
+  const vector_t full = model.getFullModelJointAngles(active, defaults);
+  for (size_t fullIndex = 0; fullIndex < settings.fullJointNames.size(); ++fullIndex) {
+    const auto& name = settings.fullJointNames[fullIndex];
+    const auto activeIt = settings.jointIndexMap.find(name);
+    EXPECT_DOUBLE_EQ(full[fullIndex], activeIt == settings.jointIndexMap.end() ? defaults[fullIndex] : active[activeIt->second]);
+  }
+  EXPECT_TRUE(model.getMpcModelJointAngles(full).isApprox(active));
+}
+
+TEST_F(CentroidalMpcRobotModelTest, ResetTargetPreservesConfigurationAndClearsMomentum) {
+  SystemObservation observation;
+  observation.time = 3.5;
+  observation.state = testState;
+  observation.state.segment<6>(6) << 1.0, -2.0, 0.76, 0.7, 0.2, -0.1;
+  observation.input = testInput;
+  const auto target = CentroidalMpcMrtJointController::currentObservationToResetTrajectory(observation);
+  ASSERT_EQ(target.stateTrajectory.size(), 1);
+  EXPECT_DOUBLE_EQ(target.timeTrajectory.front(), observation.time);
+  const auto& state = target.stateTrajectory.front();
+  EXPECT_TRUE(state.head<6>().isZero());
+  EXPECT_TRUE(state.segment<4>(6).isApprox(observation.state.segment<4>(6)));
+  EXPECT_TRUE(state.segment<2>(10).isZero());
+  EXPECT_TRUE(state.tail(state.size() - 12).isApprox(observation.state.tail(state.size() - 12)));
+  EXPECT_EQ(target.inputTrajectory.front().size(), observation.input.size());
+  EXPECT_TRUE(target.inputTrajectory.front().isZero());
+}
+
+TEST_F(CentroidalMpcRobotModelTest, ExpiredWalkingCommandStopsMotionAndPreservesPosture) {
+  CentroidalMpcInterface interface(testingModelInterface.taskFile, testingModelInterface.urdfFile, testingModelInterface.referenceFile,
+                                   false);
+  WalkingVelocityCommand captured;
+  const auto gaitFile = ament_index_cpp::get_package_share_directory("humanoid_common_mpc") + "/config/command/gait.info";
+  Ros2ProceduralMpcMotionManager manager(
+      gaitFile, testingModelInterface.referenceFile, interface.getSwitchedModelReferenceManagerPtr(), interface.getMpcRobotModel(),
+      [&](const WalkingVelocityCommand& command, scalar_t start, scalar_t, const vector_t& state) {
+        captured = command;
+        return TargetTrajectories({start}, {state}, {testInput});
+      },
+      "g1");
+  WalkingVelocityCommand command(0.8, 0.5, 0.76, 0.5, 0.2);
+  manager.setAndScaleVelocityCommand(command);
+  manager.preSolverRun(0.0, 1.0, testState, *interface.getReferenceManagerPtr());
+  EXPECT_GT(captured.linear_velocity_x, 0.0);
+  std::this_thread::sleep_for(std::chrono::milliseconds(550));
+  manager.preSolverRun(0.0, 1.0, testState, *interface.getReferenceManagerPtr());
+  EXPECT_DOUBLE_EQ(captured.linear_velocity_x, 0.0);
+  EXPECT_DOUBLE_EQ(captured.linear_velocity_y, 0.0);
+  EXPECT_DOUBLE_EQ(captured.angular_velocity_z, 0.0);
+  EXPECT_GT(captured.desired_pelvis_height, 0.7);
+  EXPECT_DOUBLE_EQ(captured.desired_waist_yaw, 0.2);
+  manager.setAndScaleVelocityCommand(command);
+  manager.preSolverRun(0.0, 1.0, testState, *interface.getReferenceManagerPtr());
+  EXPECT_GT(captured.linear_velocity_x, 0.0);
 }
 
 // Test clone functionality

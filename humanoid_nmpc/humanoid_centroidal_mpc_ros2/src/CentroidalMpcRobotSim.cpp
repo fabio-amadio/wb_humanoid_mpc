@@ -45,16 +45,16 @@ using namespace ocs2::humanoid;
 int main(int argc, char** argv) {
   std::vector<std::string> programArgs;
   programArgs = rclcpp::remove_ros_arguments(argc, argv);
-  if (programArgs.size() < 6) {
+  if (programArgs.size() < 7) {
     throw std::runtime_error("No robot name, config folder, target command file, or description name specified. Aborting.");
   }
 
-  const std::string robotName(argv[1]);
-  const std::string taskFile(argv[2]);
-  const std::string referenceFile(argv[3]);
-  const std::string urdfFile(argv[4]);
-  const std::string gaitFile(argv[5]);
-  const std::string mjxFile(argv[6]);
+  const std::string robotName(programArgs[1]);
+  const std::string taskFile(programArgs[2]);
+  const std::string referenceFile(programArgs[3]);
+  const std::string urdfFile(programArgs[4]);
+  const std::string gaitFile(programArgs[5]);
+  const std::string mjxFile(programArgs[6]);
 
   rclcpp::init(argc, argv);
 
@@ -115,6 +115,7 @@ int main(int argc, char** argv) {
   robot::mujoco_sim_interface::MujocoSimConfig config;
 
   config.scenePath = mjxFile;
+  config.headless = nodeHandle->declare_parameter("headless", false);
   config.verbose = true;
   config.initStatePtr_ = std::make_shared<robot::model::RobotState>(std::move(initState));
 
@@ -132,8 +133,11 @@ int main(int argc, char** argv) {
   robotInterface.updateInterfaceStateFromRobot();
   mpcJointController.startMpcThread(robotInterface.getRobotState());
 
-  while (!mpcJointController.ready()) {
+  while (rclcpp::ok() && !mpcJointController.ready()) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+  if (!rclcpp::ok()) {
+    return 0;
   }
   std::cout << "Initial MPC policy received. " << std::endl;
 
@@ -143,7 +147,7 @@ int main(int argc, char** argv) {
 
   rclcpp::spin_some(nodeHandle);
 
-  while (true) {
+  while (rclcpp::ok()) {
     auto targetTimeForNextIteration = std::chrono::steady_clock::now() + std::chrono::microseconds(mrtDeltaTMicroSeconds_);
 
     robotInterface.updateInterfaceStateFromRobot();
@@ -165,5 +169,6 @@ int main(int argc, char** argv) {
 
   std::cout << "ende..." << std::endl;
 
+  rclcpp::shutdown();
   return 0;
 }

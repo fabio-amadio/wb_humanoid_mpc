@@ -15,9 +15,11 @@ libxi-dev
 ninja-build
 ccache
 python3-tk
+python3-pytest
 black
 
 ros-${ROS_DISTRO}-ament-cmake-clang-format
+ros-${ROS_DISTRO}-ament-cmake-pytest
 ros-${ROS_DISTRO}-joint-state-publisher-gui
 ros-${ROS_DISTRO}-xacro
 ros-${ROS_DISTRO}-mcap-vendor
