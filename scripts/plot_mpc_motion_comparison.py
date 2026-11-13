@@ -6,11 +6,7 @@ import csv
 import json
 from pathlib import Path
 
-import matplotlib
 import numpy as np
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 
 
 COMMAND_KEYS = (
@@ -45,13 +41,25 @@ def load_motion(path):
         or len(motion["joint_pos"]) < 3
     ):
         raise ValueError(f"Joint position/velocity shapes are invalid in {path}")
-    motion["time"] = np.arange(len(motion["joint_pos"])) / motion["hz"]
+    if "time" not in motion:
+        raise ValueError(
+            f"Missing required 'time' array in {path}; expected one timestamp per motion frame"
+        )
+    motion["time"] = np.asarray(motion["time"], dtype=float)
+    if (
+        motion["time"].shape != (len(motion["joint_pos"]),)
+        or not np.isfinite(motion["time"]).all()
+        or not np.allclose(
+            np.diff(motion["time"]), 1.0 / motion["hz"], rtol=1e-6, atol=1e-9
+        )
+    ):
+        raise ValueError(f"Invalid time array in {path}")
     motion["acceleration"] = np.diff(motion["joint_vel"], axis=0) * motion["hz"]
     return motion
 
 
 def hand_tracking(motion, urdf):
-    """The generator stores state k+1 with target k; compare state k+1 to target k+1."""
+    """Compare robot hands and command targets from the same timestamped rows."""
     import pinocchio as pin
 
     model = pin.buildModelFromUrdf(str(urdf), pin.JointModelFreeFlyer())
@@ -77,13 +85,19 @@ def hand_tracking(motion, urdf):
             ).translation
     return {
         side: np.linalg.norm(
-            actual[:-1, i] - motion[side + "_hand_target_pos"][1:], axis=1
+            actual[:, i] - motion[side + "_hand_target_pos"],
+            axis=1,
         )
         for i, side in enumerate(("left", "right"))
     }
 
 
 def compare(paths, labels, output, joints=None, urdf=None, require_matched=False):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     output.mkdir(parents=True, exist_ok=True)
     motions = [load_motion(path) for path in paths]
     names = motions[0]["names"]
@@ -140,7 +154,7 @@ def compare(paths, labels, output, joints=None, urdf=None, require_matched=False
                 )
             axes[row, column].set_ylabel(ylabel)
             axes[row, column].grid(alpha=0.25)
-        axes[2, column].set_xlabel("Time since first exported frame [s]")
+        axes[2, column].set_xlabel("Time [s]")
     axes[0, 0].legend(fontsize=8)
     fig.suptitle(
         "MPC motion comparison — acceleration estimated from exported joint velocities"
@@ -199,14 +213,14 @@ def compare(paths, labels, output, joints=None, urdf=None, require_matched=False
         for motion, label, result in zip(motions, labels, results):
             errors = hand_tracking(motion, urdf)
             for axis, side in zip(axes, ("left", "right")):
-                axis.plot(motion["time"][:-1], errors[side] * 100, label=label)
+                axis.plot(motion["time"], errors[side] * 100, label=label)
                 axis.set_ylabel(side.capitalize() + " hand error [cm]")
                 axis.grid(alpha=0.25)
                 result[side + "_hand_position_rms_m"] = float(
                     np.sqrt(np.mean(errors[side] ** 2))
                 )
         axes[0].legend()
-        axes[1].set_xlabel("Time since first exported frame [s]")
+        axes[1].set_xlabel("Time [s]")
         fig.suptitle(
             "Torso-frame hand position tracking — state/target timestamps aligned"
         )

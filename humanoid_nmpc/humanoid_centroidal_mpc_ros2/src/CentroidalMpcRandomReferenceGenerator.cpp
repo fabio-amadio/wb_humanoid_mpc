@@ -352,6 +352,7 @@ struct HandPoseRandomConfig {
 };
 
 struct MotionBuffers {
+  std::vector<double> time;
   std::vector<float> jointPos;
   std::vector<float> jointVel;
   std::vector<float> bodyPos;
@@ -568,14 +569,16 @@ void saveClampNpz(const std::filesystem::path& path,
   const size_t expectedBaseCommandScalars = buffers.numFrames * 4;
   const size_t expectedHandPositionScalars = buffers.numFrames * 3;
   const size_t expectedHandQuaternionScalars = buffers.numFrames * 4;
-  if (buffers.jointPos.size() != expectedJointScalars || buffers.jointVel.size() != expectedJointScalars ||
-      buffers.bodyPos.size() != expectedBodyPositionScalars || buffers.bodyLinVel.size() != expectedBodyPositionScalars ||
-      buffers.bodyAngVel.size() != expectedBodyPositionScalars || buffers.bodyQuat.size() != expectedBodyQuaternionScalars ||
-      buffers.contactWrench.size() != expectedContactWrenchScalars || buffers.contactFlags.size() != expectedContactFlagScalars) {
+  if (buffers.time.size() != buffers.numFrames || buffers.jointPos.size() != expectedJointScalars ||
+      buffers.jointVel.size() != expectedJointScalars || buffers.bodyPos.size() != expectedBodyPositionScalars ||
+      buffers.bodyLinVel.size() != expectedBodyPositionScalars || buffers.bodyAngVel.size() != expectedBodyPositionScalars ||
+      buffers.bodyQuat.size() != expectedBodyQuaternionScalars || buffers.contactWrench.size() != expectedContactWrenchScalars ||
+      buffers.contactFlags.size() != expectedContactFlagScalars) {
     throw std::runtime_error("Motion buffer sizes do not match the requested NPZ shapes.");
   }
-  const bool hasCommandTargets = !buffers.baseCommand.empty() || !buffers.leftHandTargetPos.empty() || !buffers.rightHandTargetPos.empty() ||
-                                 !buffers.leftHandTargetQuat.empty() || !buffers.rightHandTargetQuat.empty() || !buffers.randomMode.empty();
+  const bool hasCommandTargets = !buffers.baseCommand.empty() || !buffers.leftHandTargetPos.empty() ||
+                                 !buffers.rightHandTargetPos.empty() || !buffers.leftHandTargetQuat.empty() ||
+                                 !buffers.rightHandTargetQuat.empty() || !buffers.randomMode.empty();
   if (hasCommandTargets &&
       (buffers.baseCommand.size() != expectedBaseCommandScalars || buffers.leftHandTargetPos.size() != expectedHandPositionScalars ||
        buffers.rightHandTargetPos.size() != expectedHandPositionScalars ||
@@ -585,6 +588,7 @@ void saveClampNpz(const std::filesystem::path& path,
   }
 
   std::vector<ZipEntry> entries;
+  entries.push_back({"time.npy", makeNumericNpy(buffers.time, "<f8", {buffers.numFrames})});
   entries.push_back({"joint_pos.npy", makeNumericNpy(buffers.jointPos, "<f4", {buffers.numFrames, buffers.numJoints})});
   entries.push_back({"joint_vel.npy", makeNumericNpy(buffers.jointVel, "<f4", {buffers.numFrames, buffers.numJoints})});
   entries.push_back({"body_pos_w.npy", makeNumericNpy(buffers.bodyPos, "<f4", {buffers.numFrames, buffers.numBodies, 3})});
@@ -981,11 +985,8 @@ HeadingSchedule makeInactiveHeadingSchedule(scalar_t duration) {
   return schedule;
 }
 
-ModeSchedule makeRandomModeSchedule(scalar_t duration,
-                                    scalar_t segmentMin,
-                                    scalar_t segmentMax,
-                                    scalar_t manipulationProbability,
-                                    std::mt19937& rng) {
+ModeSchedule makeRandomModeSchedule(
+    scalar_t duration, scalar_t segmentMin, scalar_t segmentMax, scalar_t manipulationProbability, std::mt19937& rng) {
   std::uniform_real_distribution<scalar_t> segmentDist(segmentMin, segmentMax);
   std::bernoulli_distribution manipulationDist(std::clamp(manipulationProbability, scalar_t(0.0), scalar_t(1.0)));
 
@@ -1153,7 +1154,8 @@ HandPoseReference sampleLocalHandPoseReference(const HandPoseBounds& bounds,
         std::clamp(previousReference.positionInReferenceFrame[i] + dist(rng), bounds.positionMin[i], bounds.positionMax[i]);
   }
   const vector3_t orientationOffsetRpy = sampleVectorInBounds(-bounds.orientationRpyStepMax, bounds.orientationRpyStepMax, rng);
-  reference.orientationReferenceToHand = (previousReference.orientationReferenceToHand * quaternionFromRpy(orientationOffsetRpy)).normalized();
+  reference.orientationReferenceToHand =
+      (previousReference.orientationReferenceToHand * quaternionFromRpy(orientationOffsetRpy)).normalized();
   return reference;
 }
 
@@ -1292,8 +1294,7 @@ HandPoseTrajectoryPair makeRandomHandPoseTrajectories(const Options& options,
     }
   }
   std::sort(knotTimes.begin(), knotTimes.end());
-  knotTimes.erase(std::unique(knotTimes.begin(), knotTimes.end(),
-                              [](scalar_t a, scalar_t b) { return std::abs(a - b) < scalar_t(1e-9); }),
+  knotTimes.erase(std::unique(knotTimes.begin(), knotTimes.end(), [](scalar_t a, scalar_t b) { return std::abs(a - b) < scalar_t(1e-9); }),
                   knotTimes.end());
 
   HandPoseRandomMode previousMode = modeSchedule.value(0.0);
@@ -1595,27 +1596,30 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
 
   const auto primitiveTrajectories =
       useBasicPrimitive ? makeBasicPrimitiveBaseTrajectories(options, rng) : std::array<SmoothScalarTrajectory, 3>{};
-  const auto vxTrajectory = useBasicPrimitive ? primitiveTrajectories[0]
-                                              : makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
-                                                                           options.vxMin, options.vxMax, 0.0, 0.0, rng);
-  const auto vyTrajectory = useBasicPrimitive ? primitiveTrajectories[1]
-                                              : makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
-                                                                           options.vyMin, options.vyMax, 0.0, 0.0, rng);
-  const auto yawRateTrajectory =
-      useBasicPrimitive ? primitiveTrajectories[2]
-                        : makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax, options.yawRateMin,
-                                                     options.yawRateMax, 0.0, 0.0, rng);
-  const auto heightTrajectory = useBasicPrimitive ? makeConstantTrajectory(options.duration, defaultBaseHeight)
-                                                  : makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin,
-                                                                               options.cmdVelSegmentMax, options.heightMin, options.heightMax,
-                                                                               defaultBaseHeight, 0.0, rng);
-  const auto stanceSchedule = useBasicPrimitive ? makeConstantStanceSchedule(options.duration, options.basicPrimitive == BasicPrimitive::STAND)
-                                                : makeRandomStanceSchedule(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
-                                                                           options.stanceProbability, rng);
-  const auto headingSchedule =
-      useBasicPrimitive ? makeInactiveHeadingSchedule(options.duration)
-                        : makeRandomHeadingSchedule(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax, options.headingProbability,
-                                                    options.headingMin, options.headingMax, rng);
+  const auto vxTrajectory = useBasicPrimitive
+                                ? primitiveTrajectories[0]
+                                : makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
+                                                             options.vxMin, options.vxMax, 0.0, 0.0, rng);
+  const auto vyTrajectory = useBasicPrimitive
+                                ? primitiveTrajectories[1]
+                                : makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
+                                                             options.vyMin, options.vyMax, 0.0, 0.0, rng);
+  const auto yawRateTrajectory = useBasicPrimitive
+                                     ? primitiveTrajectories[2]
+                                     : makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
+                                                                  options.yawRateMin, options.yawRateMax, 0.0, 0.0, rng);
+  const auto heightTrajectory = useBasicPrimitive
+                                    ? makeConstantTrajectory(options.duration, defaultBaseHeight)
+                                    : makeRandomSmoothTrajectory(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
+                                                                 options.heightMin, options.heightMax, defaultBaseHeight, 0.0, rng);
+  const auto stanceSchedule =
+      useBasicPrimitive
+          ? makeConstantStanceSchedule(options.duration, options.basicPrimitive == BasicPrimitive::STAND)
+          : makeRandomStanceSchedule(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax, options.stanceProbability, rng);
+  const auto headingSchedule = useBasicPrimitive
+                                   ? makeInactiveHeadingSchedule(options.duration)
+                                   : makeRandomHeadingSchedule(options.duration, options.cmdVelSegmentMin, options.cmdVelSegmentMax,
+                                                               options.headingProbability, options.headingMin, options.headingMax, rng);
 
   std::optional<HandPoseTrajectoryPair> handPoseTrajectories;
   ModeSchedule modeSchedule;
@@ -1632,15 +1636,14 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
                                      : makeRandomModeSchedule(options.duration, options.modeSegmentMin, options.modeSegmentMax,
                                                               manipulationProbability, rng);
     if (useBasicPrimitive) {
-      handPoseTrajectories =
-          HandPoseTrajectoryPair{makeConstantHandPoseTrajectory(options.duration, *leftDefaultReference),
-                                 makeConstantHandPoseTrajectory(options.duration, *rightDefaultReference)};
+      handPoseTrajectories = HandPoseTrajectoryPair{makeConstantHandPoseTrajectory(options.duration, *leftDefaultReference),
+                                                    makeConstantHandPoseTrajectory(options.duration, *rightDefaultReference)};
     } else {
       handPoseTrajectories =
           makeRandomHandPoseTrajectories(options, modeSchedule, handPoseRandomConfig, *leftDefaultReference, *rightDefaultReference, rng);
     }
-    std::cout << "[random_mpc_generator] hand-pose mode enabled: height fixed at " << defaultBaseHeight
-              << ", manipulation probability " << manipulationProbability
+    std::cout << "[random_mpc_generator] hand-pose mode enabled: height fixed at " << defaultBaseHeight << ", manipulation probability "
+              << manipulationProbability
               << (options.saveAdditionalInfo ? ", sampled targets will be stored in NPZ command arrays.\n" : ".\n");
   } else {
     modeSchedule = useBasicPrimitive ? makeConstantModeSchedule(options.duration, HandPoseRandomMode::WALKING)
@@ -1726,7 +1729,8 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
   const size_t numFrames = static_cast<size_t>(std::floor(options.duration * options.fps)) + 1;
 
   for (size_t frame = 0; frame < numFrames; ++frame) {
-    const scalar_t time = observation.time;
+    const scalar_t time = static_cast<scalar_t>(frame) * dt;
+    observation.time = time;
 
     vector_t sampledMpcJointState = defaultMpcJointState;
     for (const auto& [jointIndex, trajectory] : jointTrajectories) {
@@ -1734,8 +1738,7 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
     }
 
     const HandPoseRandomMode randomMode = options.handPoseMode ? modeSchedule.value(time) : HandPoseRandomMode::WALKING;
-    const bool forceStance =
-        options.handPoseMode ? (randomMode == HandPoseRandomMode::MANIPULATION) : stanceSchedule.value(time);
+    const bool forceStance = options.handPoseMode ? (randomMode == HandPoseRandomMode::MANIPULATION) : stanceSchedule.value(time);
     vector4_t velocityTarget;
     velocityTarget << vxTrajectory.value(time), vyTrajectory.value(time),
         (options.handPoseMode ? defaultBaseHeight : heightTrajectory.value(time)), yawRateTrajectory.value(time);
@@ -1818,19 +1821,13 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
     mrt.advanceMpc();
     mrt.updatePolicy();
 
-    vector_t nextState;
-    vector_t nextInput;
-    size_t nextMode = observation.mode;
-    mrt.rolloutPolicy(time, observation.state, dt, nextState, nextInput, nextMode);
-    throwIfUnexpectedSize(nextState, observation.state.size(), "rollout state", motionIndex, frame, time);
-    throwIfUnexpectedSize(nextInput, observation.input.size(), "rollout input", motionIndex, frame, time);
-    throwIfNotFinite(nextState, "rollout state", motionIndex, frame, time);
-    throwIfNotFinite(nextInput, "rollout input", motionIndex, frame, time);
-
-    observation.time = time + dt;
-    observation.state = std::move(nextState);
-    observation.input = std::move(nextInput);
-    observation.mode = nextMode;
+    // Save x(t) with command(t). Evaluate the fresh policy for instantaneous u(t),
+    // rather than pairing a post-rollout state with the preceding command.
+    vector_t policyState;
+    mrt.evaluatePolicy(time, observation.state, policyState, observation.input, observation.mode);
+    throwIfUnexpectedSize(observation.input, interface.getCentroidalModelInfo().inputDim, "policy input", motionIndex, frame, time);
+    throwIfNotFinite(observation.input, "policy input", motionIndex, frame, time);
+    buffers.time.push_back(time);
 
     const vector_t fullJointPos =
         mpcRobotModel.getFullModelJointAngles(mpcRobotModel.getJointAngles(observation.state), defaultFullJointState);
@@ -1851,6 +1848,23 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
       std::cout << "[random_mpc_generator] frame " << frame << "/" << (numFrames - 1) << " time=" << std::fixed << std::setprecision(2)
                 << observation.time << "\n";
     }
+    if (frame + 1 == numFrames) {
+      break;  // The final row is at the last requested time; do not roll beyond it.
+    }
+
+    vector_t nextState;
+    vector_t nextInput;
+    size_t nextMode = observation.mode;
+    mrt.rolloutPolicy(time, observation.state, dt, nextState, nextInput, nextMode);
+    throwIfUnexpectedSize(nextState, observation.state.size(), "rollout state", motionIndex, frame, time);
+    throwIfUnexpectedSize(nextInput, observation.input.size(), "rollout input", motionIndex, frame, time);
+    throwIfNotFinite(nextState, "rollout state", motionIndex, frame, time);
+    throwIfNotFinite(nextInput, "rollout input", motionIndex, frame, time);
+
+    observation.time = static_cast<scalar_t>(frame + 1) * dt;
+    observation.state = std::move(nextState);
+    observation.input = std::move(nextInput);
+    observation.mode = nextMode;
   }
 
   fillFiniteDifferenceBodyVelocities(buffers, dt);

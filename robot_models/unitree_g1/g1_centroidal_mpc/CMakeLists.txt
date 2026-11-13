@@ -78,6 +78,7 @@ if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(test_launch_descriptions test/test_launch_descriptions.py TIMEOUT 120)
   ament_add_pytest_test(test_motion_reference_export test/test_motion_reference_export.py TIMEOUT 120)
+  ament_add_pytest_test(test_motion_export_alignment test/test_motion_export_alignment.py TIMEOUT 600)
 endif()
 
 install(TARGETS 

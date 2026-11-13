@@ -360,6 +360,8 @@ Each output gets a numbered suffix such as:
 - `g1_random_hand_pose_mpc_reference_0000.npz`
 - `g1_random_hand_pose_mpc_reference_0001.npz`
 
+Each new NPZ contains a `time` array in seconds. Row `k` stores the robot state and sampled commands/hand targets at the same `time[k]`, beginning with the initial state at zero. Samples are spaced by `1/fps` and end at `floor(duration * fps)/fps`. Joint velocities and contact wrenches come from the policy evaluated at that row’s time. Body velocities are finite-difference estimates from the aligned poses.
+
 Use `GENERATOR_ARGS` to pass generator options such as `--duration`, `--fps`, `--seed`, `--num-motions`, or `--save-additional-info`.
 
 ## Joint-Acceleration Regularization
@@ -416,7 +418,7 @@ python3 scripts/plot_mpc_motion_comparison.py \
   --output-dir /tmp/mpc_motion_plots
 ```
 
-Plotting requires `python3-matplotlib`, now listed in `dependencies.txt`. An older container can install it with `apt-get update && apt-get install -y python3-matplotlib`. Hand-tracking plots additionally use the Pinocchio Python module already supplied by the Docker dependencies. Acceleration is estimated by differencing exported joint velocities; hand-target comparisons account for the generator's one-step state/target offset. One seed and a standing manipulation scenario are an exploratory comparison, not a worst-case latency or tracking guarantee.
+Plotting requires `python3-matplotlib`, now listed in `dependencies.txt`. An older container can install it with `apt-get update && apt-get install -y python3-matplotlib`. Hand-tracking plots additionally use the Pinocchio Python module already supplied by the Docker dependencies. Acceleration is estimated by differencing exported joint velocities; hand-target comparisons use equal-time rows for new exports. The plotting script requires the new `time` array; regenerate older files before plotting them. One seed and a standing manipulation scenario are an exploratory comparison, not a worst-case latency or tracking guarantee.
 
 ### Faster QP Backend with the Acceleration Cost
 
