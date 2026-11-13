@@ -62,7 +62,6 @@ using namespace ocs2::humanoid;
 
 namespace {
 
-constexpr scalar_t kPolicyEvaluationLeadTime = 0.005;
 constexpr scalar_t kVelocityFiniteDifferenceTime = 0.02;
 constexpr scalar_t kYahmpFutureStepDt = 0.02;
 constexpr std::array<int, 13> kYahmpFutureStepOffsets = {0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48};
@@ -209,15 +208,14 @@ class CentroidalMpcMotionReferencePublisher {
       return;
     }
 
-    if (!std::isfinite(observation.time) || observation.time + kPolicyEvaluationLeadTime < policy.timeTrajectory_.front() ||
+    if (!std::isfinite(observation.time) || observation.time < policy.timeTrajectory_.front() ||
         observation.time > policy.timeTrajectory_.back()) {
       RCLCPP_WARN_THROTTLE(nodeHandle_->get_logger(), *nodeHandle_->get_clock(), 1000,
                            "Skipping motion reference: the MPC policy does not cover the current observation time.");
       return;
     }
 
-    const scalar_t queryTime =
-        std::clamp(observation.time + kPolicyEvaluationLeadTime, policy.timeTrajectory_.front(), policy.timeTrajectory_.back());
+    const scalar_t queryTime = std::clamp(observation.time, policy.timeTrajectory_.front(), policy.timeTrajectory_.back());
     const auto policyState = sampleTrajectory(queryTime, policy.timeTrajectory_, policy.stateTrajectory_);
     const auto policyInput = sampleTrajectory(queryTime, policy.timeTrajectory_, policy.inputTrajectory_);
 

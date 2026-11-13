@@ -53,8 +53,6 @@ using namespace ocs2::humanoid;
 
 namespace {
 
-constexpr scalar_t kPolicyEvaluationLeadTime = 0.005;
-
 class CentroidalReferenceJointStatePublisher {
  public:
   CentroidalReferenceJointStatePublisher(
@@ -125,7 +123,7 @@ class CentroidalReferenceJointStatePublisher {
     }
 
     const auto& policy = policySubscriber_.getPolicy();
-    const scalar_t queryTime = observation.time + kPolicyEvaluationLeadTime;
+    const scalar_t queryTime = observation.time;
 
     vector_t policyState = queryTime <= policy.timeTrajectory_.back()
                                ? LinearInterpolation::interpolate(queryTime, policy.timeTrajectory_, policy.stateTrajectory_)
