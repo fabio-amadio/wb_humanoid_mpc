@@ -28,7 +28,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ******************************************************************************/
 
-#include <ocs2_sqp/SqpMpc.h>
 #include <rclcpp/rclcpp.hpp>
 
 #include <humanoid_centroidal_mpc/CentroidalMpcInterface.h>
@@ -62,7 +61,8 @@ int main(int argc, char** argv) {
   CentroidalMpcInterface interface(taskFile, urdfFile, referenceFile);
 
   // MPC
-  SqpMpc mpc(interface.mpcSettings(), interface.sqpSettings(), interface.getOptimalControlProblem(), interface.getInitializer());
+  auto mpcPtr = interface.createMpc();
+  auto& mpc = *mpcPtr;
 
   // Launch MPC ROS node
   rclcpp::Node::SharedPtr nodeHandle = std::make_shared<rclcpp::Node>(robotName + "_centroidal_mpc");
@@ -91,7 +91,6 @@ int main(int argc, char** argv) {
   ros2ProceduralMpcMotionManager->subscribe(nodeHandle, qos);
 
   mpc.getSolverPtr()->setReferenceManager(interface.getReferenceManagerPtr());
-  mpc.getSolverPtr()->addSynchronizedModule(interface.getInputRateSynchronizedModule());
   mpc.getSolverPtr()->addSynchronizedModule(ros2ProceduralMpcMotionManager);
 
   // Init Sim state

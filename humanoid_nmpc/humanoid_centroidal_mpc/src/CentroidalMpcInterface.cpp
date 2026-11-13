@@ -34,7 +34,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // Pinocchio forward declarations must be included first
 #include <pinocchio/fwd.hpp>  // forward declarations must be included first.
 
+#include <ocs2_sqp/SqpMpc.h>
 #include "humanoid_centroidal_mpc/CentroidalMpcInterface.h"
+#include "humanoid_centroidal_mpc/solver/InputRateSqpMpc.h"
 
 #include <ocs2_centroidal_model/AccessHelperFunctions.h>
 #include <ocs2_centroidal_model/CentroidalModelPinocchioMapping.h>
@@ -136,7 +138,6 @@ CentroidalMpcInterface::CentroidalMpcInterface(const std::string& taskFile,
       std::make_shared<SwitchedModelReferenceManager>(GaitSchedule::loadGaitSchedule(referenceFile, modelSettings_, verbose_),
                                                       std::move(swingTrajectoryPlanner), *pinocchioInterfacePtr_, *mpcRobotModelPtr_);
   referenceManagerPtr_->setArmSwingReferenceActive(modelSettings_.armSwingReferenceActive);
-  inputRateReferencePtr_ = std::make_shared<InputRateReference>();
 
   // initial state
   initialState_.setZero(centroidalModelInfo_.stateDim);
@@ -169,10 +170,9 @@ void CentroidalMpcInterface::setupOptimalControlProblem() {
   // Cost terms
   problemPtr_->costPtr->add("stateInputQuadraticCost", factory.getStateInputQuadraticCost());
   const auto inputRateCostConfig =
-      InputRateCost::loadConfig(taskFile_, "input_rate_cost.", centroidalModelInfo_.inputDim, verbose_);
-  if (inputRateCostConfig.active && inputRateCostConfig.weights.squaredNorm() > 0.0) {
-    problemPtr_->costPtr->add("inputRateCost", std::make_unique<InputRateCost>(std::move(inputRateCostConfig.weights), inputRateReferencePtr_));
-  }
+      JointAccelerationCost::loadConfig(taskFile_, "joint_acceleration_cost.", centroidalModelInfo_.inputDim, verbose_);
+  inputRateWeights_ = inputRateCostConfig.active ? inputRateCostConfig.weights
+                                                 : matrix_t::Zero(centroidalModelInfo_.inputDim, centroidalModelInfo_.inputDim);
   problemPtr_->finalCostPtr->add("terminalCost", factory.getTerminalCost());
 
   std::unique_ptr<EndEffectorKinematics<scalar_t>> eeKinematicsPtr;
@@ -260,6 +260,16 @@ void CentroidalMpcInterface::setupOptimalControlProblem() {
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
+
+std::unique_ptr<MPC_BASE> CentroidalMpcInterface::createMpc() const {
+  if (!problemPtr_ || !initializerPtr_) {
+    throw std::logic_error("[CentroidalMpcInterface] Cannot create MPC without setting up the optimal control problem.");
+  }
+  if (!inputRateWeights_.isZero(0.0)) {
+    return std::make_unique<InputRateSqpMpc>(mpcSettings_, sqpSettings_, *problemPtr_, *initializerPtr_, inputRateWeights_);
+  }
+  return std::make_unique<SqpMpc>(mpcSettings_, sqpSettings_, *problemPtr_, *initializerPtr_);
+}
 
 std::unique_ptr<StateInputConstraint> CentroidalMpcInterface::getStanceFootConstraint(const EndEffectorKinematics<scalar_t>& eeKinematics,
                                                                                       size_t contactPointIndex) {

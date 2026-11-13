@@ -360,6 +360,92 @@ Each output gets a numbered suffix such as:
 
 Use `GENERATOR_ARGS` to pass generator options such as `--duration`, `--fps`, `--seed`, `--num-motions`, or `--save-additional-info`.
 
+## Joint-Acceleration Regularization
+
+`joint_acceleration_cost` penalizes selected joint accelerations along the prediction horizon:
+
+```text
+J_acceleration = integral 0.5 * acceleration^T * weights * acceleration dt
+```
+
+Acceleration is the time derivative of the physical joint-velocity input. This replaces the earlier penalty on deviation from the previous MPC solution.
+
+It is enabled in `task_hand_pose.info` and `task_random_reference.info`, on waist, arm, and wrist velocities. Locomotion settings remain unchanged. Zero rows leave the corresponding inputs unaugmented; the nonzero weight block must be symmetric and positive definite. Set `active false` to disable the rate penalty.
+
+Internally, the selected velocities become additional solver states and their accelerations become controls. On the first solve or after a reset, velocities start from the initializer values (zero for the standard joint initializer). Later solves retain the previous policy's velocity at the new horizon start, so replanning cannot freely jump those velocities. Reference updates, dummy rollout, ROS policies, and NPZ exports retain their original physical state/input layouts.
+
+The current configurations add 17 solver states. This increases solve time and requires `useFeedbackPolicy false`; the exported controller is feedforward. The formulation is validated with the configured upper-body weights; changing weights on inputs involved in hard contact constraints may require a different constraint formulation. Rates are penalized rather than hard-limited. Larger weights favor smoother motion with slower tracking response, and the new weights have different units from the old previous-plan penalty.
+
+### Compare Rate Weights and Monitor Teleoperation Output
+
+Inside Docker, launch the hand-pose task with current-command publishing:
+
+```bash
+make launch-g1-dummy-sim-hand-pose-pub-mpc-motion-ref
+```
+
+In another container shell, source the overlay and measure wall-clock reception rates:
+
+```bash
+source /opt/ros/humble/setup.bash
+source /wb_humanoid_mpc_ws/install/setup.bash
+ros2 topic hz /g1/mpc_motion_reference --wall-time --window 200
+# In a separate shell, monitor fresh MPC policies:
+ros2 topic hz /g1/mpc_policy --wall-time --window 200
+```
+
+The current task sets `mpcDesiredFrequency` to `50`. In this dummy backend, a positive value selects a synchronized loop that waits for new policies, and publishes observations/commands at the MPC update points. The 100 Hz internal rollout rate does not imply 100 Hz command publication. A negative `mpcDesiredFrequency` selects the asynchronous real-time dummy loop, which publishes observations/commands at the rollout rate while reusing the latest policy. Monitor fresh policies as well as commands when judging teleoperation performance.
+
+To generate matched standing hand-manipulation motions and plot positions, velocities, accelerations, and hand tracking:
+
+```bash
+python3 scripts/compare_input_rate.py --duration 12 --fps 50 --seed 1
+```
+
+This compares no rate penalty, the configured weight, and ten times that weight. It writes NPZ files, plots, copied task/reference files, hashes, timing logs, and metrics under `generated_motions/input_rate_comparison/`. It refuses to overwrite a nonempty directory; use `--output-dir` for subsequent comparisons. Source configurations are not edited. The generator's optional `--no-base-command-filter` bypasses its wall-clock filter for this comparison, and saved command targets are checked for exact equality across runs. Normal generator behavior is unchanged.
+
+Plot already generated files, selecting any joints of interest:
+
+```bash
+python3 scripts/plot_mpc_motion_comparison.py \
+  generated_motions/input_rate_comparison/rate_off.npz \
+  generated_motions/input_rate_comparison/rate_1x.npz \
+  --labels off on --joints left_elbow_joint right_wrist_yaw_joint \
+  --output-dir /tmp/mpc_motion_plots
+```
+
+Plotting requires `python3-matplotlib`, now listed in `dependencies.txt`. An older container can install it with `apt-get update && apt-get install -y python3-matplotlib`. Hand-tracking plots additionally use the Pinocchio Python module already supplied by the Docker dependencies. Acceleration is estimated by differencing exported joint velocities; hand-target comparisons account for the generator's one-step state/target offset. One seed and a standing manipulation scenario are an exploratory comparison, not a worst-case latency or tracking guarantee.
+
+### Faster QP Backend with the Acceleration Cost
+
+The vendored BLASFEO wrapper builds generic CPU kernels. On an AVX2/FMA CPU, a separate optimized BLASFEO/HPIPM build can reduce QP time while retaining the extended state, acceleration weights, horizon, and integration settings. Build it inside Docker after the normal workspace build:
+
+```bash
+bash scripts/build_fast_qp.bash
+```
+
+This uses the workspace's pinned dependency source caches without downloading new versions. It installs under `.docker_ws/optimized_qp/avx2/` and leaves the standard libraries untouched. No Docker image rebuild is needed. Both scripts check the CPU supports AVX2 and FMA.
+
+Launch the hand-pose task with the optimized libraries:
+
+```bash
+bash scripts/with_fast_qp.bash ros2 launch \
+  g1_centroidal_mpc dummy_sim_hands_cartesian.launch.py \
+  publish_mpc_motion_reference:=true
+```
+
+The wrapper sources ROS and the workspace before selecting the optimized libraries. Use it with the direct `ros2` command; Make launch targets source the workspace again and can override library selection. Ordinary launch commands continue using the standard backend. Restart the launch to switch backends.
+
+For a repeatable walking comparison with the acceleration cost active:
+
+```bash
+source /opt/ros/humble/setup.bash
+source /wb_humanoid_mpc_ws/install/setup.bash
+python3 scripts/benchmark_fast_qp.py
+```
+
+The benchmark alternates backend order, checks library loading and matched command targets, and saves timings plus differences in exported joint positions and velocities under `generated_motions/fast_qp_comparison/`. Use `--output-dir` for subsequent runs. Rebuild this optional backend when the pinned BLASFEO/HPIPM dependencies change.
+
 ## Development Checks
 
 Run builds and tests inside the Docker container:

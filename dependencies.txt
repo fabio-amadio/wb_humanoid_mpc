@@ -16,6 +16,7 @@ ninja-build
 ccache
 python3-tk
 python3-pytest
+python3-matplotlib
 black
 
 ros-${ROS_DISTRO}-ament-cmake-clang-format

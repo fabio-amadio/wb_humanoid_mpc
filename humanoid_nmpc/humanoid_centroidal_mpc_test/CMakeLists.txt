@@ -80,6 +80,9 @@ add_definitions("-DBOOST_MPL_LIMIT_LIST_SIZE=30")
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
 
+  ament_add_gtest(test_input_rate_sqp_mpc src/testInputRateSqpMpc.cpp)
+  ament_target_dependencies(test_input_rate_sqp_mpc ${dependencies})
+
   ament_add_gtest(test_centroidal_mpc_robot_model src/testCentroidalMpcRobotModel.cpp)
   ament_target_dependencies(test_centroidal_mpc_robot_model
     ${dependencies}

@@ -90,6 +90,7 @@ add_library(${PROJECT_NAME}
   src/CentroidalMpcInterface.cpp
   src/command/CentroidalMpcTargetTrajectoriesCalculator.cpp
   src/mrt/CentroidalMpcMrtJointController.cpp
+  src/solver/InputRateSqpMpc.cpp
 )
 ament_target_dependencies(${PROJECT_NAME}
   ${dependencies}

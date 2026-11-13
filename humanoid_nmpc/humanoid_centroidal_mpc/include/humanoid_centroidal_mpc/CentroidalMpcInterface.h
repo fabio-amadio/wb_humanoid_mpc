@@ -33,6 +33,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ocs2_core/Types.h>
 #include <ocs2_core/penalties/Penalties.h>
 #include <ocs2_ddp/DDP_Settings.h>
+#include <ocs2_mpc/MPC_BASE.h>
 #include <ocs2_mpc/MPC_Settings.h>
 #include <ocs2_oc/rollout/TimeTriggeredRollout.h>
 #include <ocs2_pinocchio_interface/PinocchioEndEffectorKinematicsCppAd.h>
@@ -44,7 +45,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "humanoid_centroidal_mpc/common/CentroidalMpcRobotModel.h"
 #include "humanoid_centroidal_mpc/initialization/CentroidalWeightCompInitializer.h"
 #include "humanoid_common_mpc/common/ModelSettings.h"
-#include "humanoid_common_mpc/cost/InputRateCost.h"
+#include "humanoid_common_mpc/cost/JointAccelerationCost.h"
 #include "humanoid_common_mpc/reference_manager/ProceduralMpcMotionManager.h"
 #include "humanoid_common_mpc/reference_manager/SwitchedModelReferenceManager.h"
 
@@ -87,7 +88,8 @@ class CentroidalMpcInterface final : public RobotInterface {
 
   const CentroidalMpcRobotModel<scalar_t>& getMpcRobotModel() const { return *mpcRobotModelPtr_; }
   const CentroidalMpcRobotModel<ad_scalar_t>& getMpcRobotModelAD() const { return *mpcRobotModelADPtr_; }
-  std::shared_ptr<SolverSynchronizedModule> getInputRateSynchronizedModule() const { return inputRateReferencePtr_; }
+  /** Construct SQP with internal input-rate states when joint_acceleration_cost is active. External coordinates stay physical. */
+  std::unique_ptr<MPC_BASE> createMpc() const;
 
   std::vector<std::string> getCostNames() const;
   std::vector<std::string> getTerminalCostNames() const;
@@ -117,7 +119,7 @@ class CentroidalMpcInterface final : public RobotInterface {
 
   std::unique_ptr<OptimalControlProblem> problemPtr_;
   std::shared_ptr<SwitchedModelReferenceManager> referenceManagerPtr_;
-  std::shared_ptr<InputRateReference> inputRateReferencePtr_;
+  matrix_t inputRateWeights_;
 
   std::unique_ptr<CentroidalMpcRobotModel<scalar_t>> mpcRobotModelPtr_;
   std::unique_ptr<CentroidalMpcRobotModel<ad_scalar_t>> mpcRobotModelADPtr_;

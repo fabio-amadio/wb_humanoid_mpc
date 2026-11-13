@@ -39,7 +39,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ocs2_core/misc/LoadData.h>
 #include <ocs2_mpc/MPC_MRT_Interface.h>
 #include <ocs2_robotic_tools/common/RotationTransforms.h>
-#include <ocs2_sqp/SqpMpc.h>
 
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -182,6 +181,7 @@ struct Options {
   scalar_t minimumHandSeparation = 0.10;
   scalar_t basicPrimitiveMinSpeedRatio = 0.60;
   bool saveAdditionalInfo = false;
+  bool bypassBaseCommandFilter = false;
   BasicPrimitive basicPrimitive = BasicPrimitive::RANDOM;
 };
 
@@ -766,6 +766,8 @@ Options parseOptions(int argc, char** argv) {
       options.minimumHandSeparation = parseScalar(requireValue(i, argc, argv), arg);
     } else if (arg == "--save-additional-info") {
       options.saveAdditionalInfo = true;
+    } else if (arg == "--no-base-command-filter") {
+      options.bypassBaseCommandFilter = true;
     } else if (arg == "--no-save-additional-info") {
       options.saveAdditionalInfo = false;
     } else if (arg == "--wrist-segment-min") {
@@ -788,6 +790,7 @@ Options parseOptions(int argc, char** argv) {
                 << "       [--manipulation-probability P] [--mode-segment-min SEC] [--mode-segment-max SEC]\n"
                 << "       [--hand-hold-probability P]\n"
                 << "       [--minimum-hand-separation M] [--save-additional-info]\n"
+                << "       [--no-base-command-filter] (bypass wall-clock filtering for reproducible comparisons)\n"
                 << "       [--wrist-segment-min SEC] [--wrist-segment-max SEC]\n"
                 << "       [--task-file PATH] [--reference-file PATH] [--urdf-file PATH] [--gait-file PATH]\n";
       std::exit(0);
@@ -1543,9 +1546,9 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
   CentroidalMpcInterface interface(options.taskFile, options.urdfFile, options.referenceFile, true);
   interface.getSwitchedModelReferenceManagerPtr()->setArmSwingReferenceActive(false);
 
-  SqpMpc mpc(interface.mpcSettings(), interface.sqpSettings(), interface.getOptimalControlProblem(), interface.getInitializer());
+  auto mpcPtr = interface.createMpc();
+  auto& mpc = *mpcPtr;
   mpc.getSolverPtr()->setReferenceManager(interface.getReferenceManagerPtr());
-  mpc.getSolverPtr()->addSynchronizedModule(interface.getInputRateSynchronizedModule());
   MPC_MRT_Interface mrt(mpc);
   mrt.initRollout(&interface.getRollout());
 
@@ -1742,7 +1745,8 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
       velocityTarget[3] = 0.0;
     }
     WalkingVelocityCommand filteredCommand;
-    filteredCommand.setFromVector(velocityCommandFilter.getFilteredVector(velocityTarget));
+    filteredCommand.setFromVector(options.bypassBaseCommandFilter ? velocityTarget
+                                                                  : vector4_t(velocityCommandFilter.getFilteredVector(velocityTarget)));
     const auto [useHeading, headingTarget] = headingSchedule.value(time);
     if (!forceStance && useHeading) {
       // Base pose layout is [x, y, z, yaw, pitch, roll].

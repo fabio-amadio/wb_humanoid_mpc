@@ -32,7 +32,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <ocs2_ros2_interfaces/mpc/MPC_ROS_Interface.h>
 #include <ocs2_ros2_interfaces/synchronized_module/RosReferenceManager.h>
-#include <ocs2_sqp/SqpMpc.h>
 
 #include <humanoid_centroidal_mpc/CentroidalMpcInterface.h>
 
@@ -61,7 +60,8 @@ int main(int argc, char** argv) {
   CentroidalMpcInterface interface(taskFile, urdfFile, referenceFile, true);
 
   // MPC
-  SqpMpc mpc(interface.mpcSettings(), interface.sqpSettings(), interface.getOptimalControlProblem(), interface.getInitializer());
+  auto mpcPtr = interface.createMpc();
+  auto& mpc = *mpcPtr;
 
   // Launch MPC ROS node
   rclcpp::Node::SharedPtr nodeHandle = std::make_shared<rclcpp::Node>(robotName + "_mpc");
@@ -85,7 +85,6 @@ int main(int argc, char** argv) {
   ros2ProceduralMpcMotionManager->subscribe(nodeHandle, qos);
 
   mpc.getSolverPtr()->setReferenceManager(interface.getReferenceManagerPtr());
-  mpc.getSolverPtr()->addSynchronizedModule(interface.getInputRateSynchronizedModule());
   mpc.getSolverPtr()->addSynchronizedModule(ros2ProceduralMpcMotionManager);
 
   MPC_ROS_Interface mpcNode(mpc, robotName);

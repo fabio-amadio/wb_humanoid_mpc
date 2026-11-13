@@ -88,7 +88,7 @@ add_library(${PROJECT_NAME}
         src/constraint/ContactMomentXYConstraintCppAd.cpp
         src/constraint/EndEffectorKinematicsLinearVelConstraint.cpp
         src/cost/StateInputQuadraticCost.cpp
-        src/cost/InputRateCost.cpp
+        src/cost/JointAccelerationCost.cpp
         src/cost/EndEffectorKinematicCostHelpers.cpp
         src/cost/EndEffectorKinematicsQuadraticCost.cpp
         src/cost/ExternalTorqueQuadraticCostAD.cpp

@@ -29,59 +29,22 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include <ocs2_core/loopshaping/LoopshapingDefinition.h>
 #include <memory>
-#include <mutex>
-
-#include <ocs2_core/cost/StateInputCost.h>
-#include <ocs2_oc/synchronized_module/SolverSynchronizedModule.h>
 
 namespace ocs2::humanoid {
 
-class InputRateReference final : public SolverSynchronizedModule {
- public:
-  void preSolverRun(scalar_t initTime, scalar_t finalTime, const vector_t& initState,
-                    const ReferenceManagerInterface& referenceManager) override;
-
-  void postSolverRun(const PrimalSolution& primalSolution) override;
-
-  bool getReferenceInput(scalar_t time, size_t inputDim, vector_t& referenceInput) const;
-
- private:
-  mutable std::mutex mutex_;
-  scalar_array_t timeTrajectory_;
-  vector_array_t inputTrajectory_;
-};
-
-class InputRateCost final : public StateInputCost {
+/** Joint-acceleration cost: selected joint velocities become states z, with dz/dt = a and cost 0.5 a' W a. */
+class JointAccelerationCost {
  public:
   struct Config {
     bool active = false;
     matrix_t weights;
   };
 
-  InputRateCost(matrix_t weights, std::shared_ptr<const InputRateReference> referencePtr);
-
-  ~InputRateCost() override = default;
-  InputRateCost* clone() const override { return new InputRateCost(*this); }
-
   static Config loadConfig(const std::string& taskFile, const std::string& prefix, size_t inputDim, bool verbose);
-
-  bool isActive(scalar_t time) const override;
-
-  scalar_t getValue(scalar_t time, const vector_t& state, const vector_t& input, const TargetTrajectories& targetTrajectories,
-                    const PreComputation& preComp) const override;
-
-  ScalarFunctionQuadraticApproximation getQuadraticApproximation(scalar_t time,
-                                                                 const vector_t& state,
-                                                                 const vector_t& input,
-                                                                 const TargetTrajectories& targetTrajectories,
-                                                                 const PreComputation& preComp) const override;
-
- private:
-  InputRateCost(const InputRateCost& rhs) = default;
-
-  matrix_t weights_;
-  std::shared_ptr<const InputRateReference> referencePtr_;
+  /** Returns nullptr for all-zero weights. Unweighted inputs remain ordinary control inputs. */
+  static std::shared_ptr<LoopshapingDefinition> createDefinition(const matrix_t& weights);
 };
 
 }  // namespace ocs2::humanoid
