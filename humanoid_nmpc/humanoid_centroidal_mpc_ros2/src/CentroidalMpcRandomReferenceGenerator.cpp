@@ -77,6 +77,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <zlib.h>
 #include <Eigen/Geometry>
 
+#include "GenerationManifest.h"
+
 using namespace ocs2;
 using namespace ocs2::humanoid;
 
@@ -1918,6 +1920,62 @@ int runGenerationAttempt(const Options& options, const std::filesystem::path& ou
 int main(int argc, char** argv) {
   const Options options = parseOptions(argc, argv);
 
+  const auto firstOutput = outputPathForMotion(options.output, 0, options.numMotions, options.basicPrimitive);
+  const auto sourceRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path().parent_path();
+  generation_metadata::GenerationManifest manifest(
+      std::filesystem::absolute(firstOutput).parent_path(), sourceRoot,
+      {{"task", options.taskFile}, {"reference", options.referenceFile}, {"gait", options.gaitFile}, {"urdf", options.urdfFile}}, argc,
+      argv, [&](generation_metadata::JsonObject& json) {
+#define RECORD_OPTION(option) json.field(#option, options.option)
+        RECORD_OPTION(taskFile);
+        RECORD_OPTION(referenceFile);
+        RECORD_OPTION(urdfFile);
+        RECORD_OPTION(gaitFile);
+        RECORD_OPTION(handPoseMode);
+        RECORD_OPTION(output);
+        RECORD_OPTION(duration);
+        RECORD_OPTION(fps);
+        RECORD_OPTION(seed);
+        RECORD_OPTION(numMotions);
+        RECORD_OPTION(maxAttemptsPerMotion);
+        RECORD_OPTION(vxMin);
+        RECORD_OPTION(vxMax);
+        RECORD_OPTION(vyMin);
+        RECORD_OPTION(vyMax);
+        RECORD_OPTION(yawRateMin);
+        RECORD_OPTION(yawRateMax);
+        RECORD_OPTION(heightMin);
+        RECORD_OPTION(heightMax);
+        RECORD_OPTION(baseCommandDeadband);
+        RECORD_OPTION(cmdVelSegmentMin);
+        RECORD_OPTION(cmdVelSegmentMax);
+        RECORD_OPTION(waistSegmentMin);
+        RECORD_OPTION(waistSegmentMax);
+        RECORD_OPTION(armSegmentMin);
+        RECORD_OPTION(armSegmentMax);
+        RECORD_OPTION(wristSegmentMin);
+        RECORD_OPTION(wristSegmentMax);
+        RECORD_OPTION(armLimitMargin);
+        RECORD_OPTION(stanceProbability);
+        RECORD_OPTION(headingProbability);
+        RECORD_OPTION(headingMin);
+        RECORD_OPTION(headingMax);
+        RECORD_OPTION(headingControlStiffness);
+        RECORD_OPTION(upperBodyFixedProbability);
+        RECORD_OPTION(manipulationProbability);
+        RECORD_OPTION(manipulationProbabilityOverridden);
+        RECORD_OPTION(modeSegmentMin);
+        RECORD_OPTION(modeSegmentMax);
+        RECORD_OPTION(handHoldPreviousValueProbability);
+        RECORD_OPTION(minimumHandSeparation);
+        RECORD_OPTION(basicPrimitiveMinSpeedRatio);
+        RECORD_OPTION(saveAdditionalInfo);
+        RECORD_OPTION(bypassBaseCommandFilter);
+#undef RECORD_OPTION
+        json.field("basicPrimitive", basicPrimitiveName(options.basicPrimitive));
+      });
+  std::cout << "[random_mpc_generator] generation metadata: " << manifest.path().string() << "\n";
+
   std::cout << "[random_mpc_generator] task file: " << options.taskFile << "\n";
   std::cout << "[random_mpc_generator] reference file: " << options.referenceFile << "\n";
   std::cout << "[random_mpc_generator] urdf file: " << options.urdfFile << "\n";
@@ -1926,40 +1984,56 @@ int main(int argc, char** argv) {
   std::cout << "[random_mpc_generator] num motions: " << options.numMotions << "\n";
   std::cout << "[random_mpc_generator] max attempts per motion: " << options.maxAttemptsPerMotion << "\n";
 
-  for (size_t motionIndex = 0; motionIndex < options.numMotions; ++motionIndex) {
-    const auto outputPath = outputPathForMotion(options.output, motionIndex, options.numMotions, options.basicPrimitive);
-    bool generated = false;
-    for (size_t attemptIndex = 0; attemptIndex < options.maxAttemptsPerMotion; ++attemptIndex) {
-      const uint32_t attemptSeed = options.seed + static_cast<uint32_t>(motionIndex * options.maxAttemptsPerMotion + attemptIndex);
-      const auto temporaryOutputPath = temporaryOutputPathForAttempt(outputPath, attemptIndex);
-      std::filesystem::remove(temporaryOutputPath);
-
-      const int attemptStatus = runGenerationAttempt(options, temporaryOutputPath, attemptSeed, motionIndex);
-      if (WIFEXITED(attemptStatus) && WEXITSTATUS(attemptStatus) == EXIT_SUCCESS) {
-        std::filesystem::remove(outputPath);
-        std::filesystem::rename(temporaryOutputPath, outputPath);
-        std::cout << "[random_mpc_generator] motion " << motionIndex << " accepted after attempt " << (attemptIndex + 1) << "/"
-                  << options.maxAttemptsPerMotion << ": " << outputPath.string() << "\n";
-        generated = true;
-        break;
-      } else {
+  try {
+    for (size_t motionIndex = 0; motionIndex < options.numMotions; ++motionIndex) {
+      const auto outputPath = outputPathForMotion(options.output, motionIndex, options.numMotions, options.basicPrimitive);
+      bool generated = false;
+      for (size_t attemptIndex = 0; attemptIndex < options.maxAttemptsPerMotion; ++attemptIndex) {
+        const uint32_t attemptSeed = options.seed + static_cast<uint32_t>(motionIndex * options.maxAttemptsPerMotion + attemptIndex);
+        const auto temporaryOutputPath = temporaryOutputPathForAttempt(outputPath, attemptIndex);
         std::filesystem::remove(temporaryOutputPath);
-        std::cerr << "[random_mpc_generator] motion " << motionIndex << " attempt " << (attemptIndex + 1) << "/"
-                  << options.maxAttemptsPerMotion << " failed with seed " << attemptSeed;
-        if (WIFSIGNALED(attemptStatus)) {
-          std::cerr << " due to signal " << WTERMSIG(attemptStatus);
-        } else if (WIFEXITED(attemptStatus)) {
-          std::cerr << " with exit code " << WEXITSTATUS(attemptStatus);
+
+        const int attemptStatus = runGenerationAttempt(options, temporaryOutputPath, attemptSeed, motionIndex);
+        if (WIFEXITED(attemptStatus) && WEXITSTATUS(attemptStatus) == EXIT_SUCCESS) {
+          try {
+            manifest.checkInputs();
+            std::filesystem::rename(temporaryOutputPath, outputPath);
+            manifest.record(motionIndex, outputPath, attemptSeed, attemptIndex + 1);
+          } catch (...) {
+            std::filesystem::remove(temporaryOutputPath);
+            throw;
+          }
+          std::cout << "[random_mpc_generator] motion " << motionIndex << " accepted after attempt " << (attemptIndex + 1) << "/"
+                    << options.maxAttemptsPerMotion << ": " << outputPath.string() << "\n";
+          generated = true;
+          break;
+        } else {
+          std::filesystem::remove(temporaryOutputPath);
+          std::cerr << "[random_mpc_generator] motion " << motionIndex << " attempt " << (attemptIndex + 1) << "/"
+                    << options.maxAttemptsPerMotion << " failed with seed " << attemptSeed;
+          if (WIFSIGNALED(attemptStatus)) {
+            std::cerr << " due to signal " << WTERMSIG(attemptStatus);
+          } else if (WIFEXITED(attemptStatus)) {
+            std::cerr << " with exit code " << WEXITSTATUS(attemptStatus);
+          }
+          std::cerr << "\n";
         }
-        std::cerr << "\n";
+      }
+
+      if (!generated) {
+        std::ostringstream ss;
+        ss << "Failed to generate motion " << motionIndex << " after " << options.maxAttemptsPerMotion << " attempts.";
+        throw std::runtime_error(ss.str());
       }
     }
-
-    if (!generated) {
-      std::ostringstream ss;
-      ss << "Failed to generate motion " << motionIndex << " after " << options.maxAttemptsPerMotion << " attempts.";
-      throw std::runtime_error(ss.str());
+    manifest.complete();
+  } catch (const std::exception& error) {
+    try {
+      manifest.fail(error.what());
+    } catch (const std::exception& writeError) {
+      std::cerr << writeError.what() << "\n";
     }
+    throw;
   }
   return 0;
 }

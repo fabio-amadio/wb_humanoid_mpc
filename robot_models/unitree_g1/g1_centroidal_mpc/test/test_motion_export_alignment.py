@@ -1,6 +1,8 @@
 """Check generator timestamps against the configured initial state and plotting errors."""
 
 import importlib.util
+import hashlib
+import json
 from pathlib import Path
 import re
 import subprocess
@@ -24,7 +26,7 @@ def exports(tmp_path_factory):
     )
     motions = {}
     for fps in (25, 50):
-        output = directory / f"motion_{fps}.npz"
+        output = directory / f'motion_{fps}_"quoted".npz'
         command = [
             str(executable),
             "--task-file",
@@ -39,8 +41,10 @@ def exports(tmp_path_factory):
             str(fps),
             "--seed",
             "1",
+            "--num-motions",
+            "2",
             "--max-attempts-per-motion",
-            "1",
+            "3",
             "--save-additional-info",
             "--no-base-command-filter",
             "--manipulation-probability",
@@ -50,7 +54,7 @@ def exports(tmp_path_factory):
             command, cwd=workspace, capture_output=True, text=True, timeout=540
         )
         assert result.returncode == 0, result.stdout + result.stderr
-        motions[fps] = output
+        motions[fps] = output.with_name(output.stem + "_0000" + output.suffix)
     return motions, task
 
 
@@ -135,3 +139,52 @@ def test_tracking_uses_equal_time_rows_and_requires_timestamps(exports, tmp_path
         )
     with pytest.raises(ValueError, match="Missing required 'time' array"):
         plotting.load_motion(without_time)
+
+
+@pytest.mark.parametrize("fps", [25, 50])
+def test_one_manifest_per_generation_run(exports, fps):
+    paths, task = exports
+    motion = paths[fps]
+    manifests = list(motion.parent.glob("generation_*.json"))
+    # Two generator invocations, each producing two motions: two manifests, not four.
+    assert len(manifests) == 2
+    assert len(list(motion.parent.glob("*.npz"))) == 4
+    assert not list(motion.parent.glob("*.npz.json"))
+    metadata = next(
+        data
+        for data in [json.loads(path.read_text()) for path in manifests]
+        if any(entry["file"] == motion.name for entry in data["motions"])
+    )
+    assert metadata["status"] == "completed"
+    assert metadata["completed_motions"] == 2
+    options = metadata["options"]
+    assert options["numMotions"] == 2
+    assert options["seed"] == 1
+    assert options["fps"] == fps
+    assert options["handPoseMode"] is True
+    assert options["saveAdditionalInfo"] is True
+    assert options["bypassBaseCommandFilter"] is True
+    assert metadata["argv"][metadata["argv"].index("--output") + 1] == options["output"]
+    assert len(metadata["motions"]) == 2
+    for index, record in enumerate(metadata["motions"]):
+        assert record["index"] == index
+        assert (motion.parent / record["file"]).is_file()
+        assert 1 <= record["attempts"] <= options["maxAttemptsPerMotion"]
+        assert record["seed"] == (
+            options["seed"]
+            + index * options["maxAttemptsPerMotion"]
+            + record["attempts"]
+            - 1
+        ) % (2 ** 32)
+        assert set(record) == {"index", "file", "seed", "attempts"}
+    assert metadata["inputs"]["task"]["contents"] == task.read_text()
+    for entry in metadata["inputs"].values():
+        assert entry["contents"].encode() == Path(entry["path"]).read_bytes()
+        assert entry["sha256"] == hashlib.sha256(entry["contents"].encode()).hexdigest()
+    assert metadata["conventions"]["quaternion_order"] == "wxyz"
+    libraries = metadata["solver"]["libraries"]
+    assert any("libblasfeo.so" in entry["path"] for entry in libraries)
+    assert any("libhpipm.so" in entry["path"] for entry in libraries)
+    assert all(len(entry["sha256"]) == 64 for entry in libraries)
+    assert len(metadata["source_tree"]["generator_sha256"]) == 64
+    assert not list(motion.parent.glob("*.tmp"))

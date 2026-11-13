@@ -364,6 +364,8 @@ Each output gets a numbered suffix such as:
 
 Each new NPZ contains a `time` array in seconds. Row `k` stores the robot state and sampled commands/hand targets at the same `time[k]`, beginning with the initial state at zero. Samples are spaced by `1/fps` and end at `floor(duration * fps)/fps`. Joint velocities and contact wrenches come from the policy evaluated at that row’s time. Body velocities are finite-difference estimates from the aligned poses.
 
+Each generator invocation also writes **one** `generation_<run-id>.json` alongside its output motions. The manifest stores all resolved generation options, the invocation, input-file snapshots and SHA-256 hashes, the source-tree revision/dirty flag, and generator/solver-library fingerprints once for the entire run. Its compact `motions` list records each filename, actual successful seed, and attempt count. The manifest is updated after each accepted motion and marked `completed` or `failed`; an interrupted run remains `running`. Repeated invocations receive separate manifests. No per-motion JSON files are created. Seeds and snapshots support reproducing the setup; wall-clock filtering and numerical execution can affect exact trajectories.
+
 Use `GENERATOR_ARGS` to pass generator options such as `--duration`, `--fps`, `--seed`, `--num-motions`, or `--save-additional-info`.
 
 ## Joint-Acceleration Regularization
