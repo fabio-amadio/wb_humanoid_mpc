@@ -142,6 +142,8 @@ target_compile_options(test_end_effector_kinematic_cost_element PUBLIC ${FLAGS})
 
 if (BUILD_TESTING)
         find_package(ament_cmake_gtest REQUIRED)
+        ament_add_gtest(test_command_filter test/testBreakFrequencyAlphaFilter.cpp)
+        ament_target_dependencies(test_command_filter ${dependencies})
 
 endif ()
 

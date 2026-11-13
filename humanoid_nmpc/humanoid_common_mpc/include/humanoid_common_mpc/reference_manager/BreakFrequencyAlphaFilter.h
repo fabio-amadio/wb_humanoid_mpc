@@ -31,39 +31,45 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
 #include <humanoid_common_mpc/common/Types.h>
+#include <cassert>
+#include <chrono>
 #include <cmath>
 
 namespace ocs2::humanoid {
 
 class BreakFrequencyAlphaFilter final {
  public:
+  using Clock = std::chrono::steady_clock;
+
   /**
    * Constructor
    *
    * @param [in] breakFrequency: Break frequency (cut-off frequency) in Hz.
+   * @param [in] now: Time of the initial sample; defaults to the monotonic clock.
    */
-  BreakFrequencyAlphaFilter(scalar_t breakFrequency, const vector_t& y_init)
-      : breakDeltaT_(1 / (2 * M_PI * breakFrequency)), y_last_(y_init) {
-    lastTimeFilterCalled = std::chrono::steady_clock::now();
-  };
+  BreakFrequencyAlphaFilter(scalar_t breakFrequency, const vector_t& y_init, Clock::time_point now = Clock::now())
+      : breakDeltaT_(1 / (2 * M_PI * breakFrequency)), y_last_(y_init), lastTimeFilterCalled(now) {}
 
-  vector_t getFilteredVector(const vector_t& x) {
+  /** Update from the previous output and elapsed sample time. Explicit timestamps must be nondecreasing. */
+  vector_t getFilteredVector(const vector_t& x, Clock::time_point now = Clock::now()) {
     assert(x.size() == y_last_.size());
-    scalar_t alpha = computeAlpha();
-    return (alpha * x + (1 - alpha) * y_last_);
+    assert(now >= lastTimeFilterCalled);
+    const scalar_t alpha = computeAlpha(now);
+    y_last_ = alpha * x + (1 - alpha) * y_last_;
+    lastTimeFilterCalled = now;
+    return y_last_;
   }
 
  private:
-  scalar_t computeAlpha() {
-    auto now = std::chrono::steady_clock::now();
-    std::chrono::duration<double> durationInSeconds = now - lastTimeFilterCalled;
+  scalar_t computeAlpha(Clock::time_point now) const {
+    const std::chrono::duration<double> durationInSeconds = now - lastTimeFilterCalled;
     scalar_t delta_t = durationInSeconds.count();
     return (delta_t / (delta_t + breakDeltaT_));
   }
 
   scalar_t breakDeltaT_;
   vector_t y_last_;
-  std::chrono::time_point<std::chrono::steady_clock> lastTimeFilterCalled;
+  Clock::time_point lastTimeFilterCalled;
 };
 
 }  // namespace ocs2::humanoid

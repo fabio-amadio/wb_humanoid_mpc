@@ -237,6 +237,8 @@ WalkingVelocityCommand Ros2ProceduralMpcMotionManager::getScaledWalkingVelocityC
     command.linear_velocity_x = 0.0;
     command.linear_velocity_y = 0.0;
     command.angular_velocity_z = 0.0;
+    // Discard stale velocity history so the watchdog stop is not delayed by filtering.
+    velocityCommandFilter = BreakFrequencyAlphaFilter(5, command.toVector());
   }
   command.setWaistOrientation(interpolateWaistOrientation(time));
   return command;
