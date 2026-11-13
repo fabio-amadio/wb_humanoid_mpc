@@ -146,14 +146,32 @@ void Ros2ProceduralMpcMotionManager::subscribe(rclcpp::Node::SharedPtr nodeHandl
       [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) { this->setHandPoseReference("right_hand", *msg); });
 }
 
-void Ros2ProceduralMpcMotionManager::setHandPoseReference(const std::string& referenceName, const geometry_msgs::msg::PoseStamped& msg) {
+bool Ros2ProceduralMpcMotionManager::setHandPoseReference(const std::string& referenceName, const geometry_msgs::msg::PoseStamped& msg) {
+  const auto referenceManager = switchedModelReferenceManagerPtr_->getHandPoseReferenceManagerPtr();
+  const auto expectedFrame = referenceManager->getReferenceFrame(referenceName);
+  static rclcpp::Clock steadyClock(RCL_STEADY_TIME);
+  const auto logger = rclcpp::get_logger("Ros2ProceduralMpcMotionManager");
+  // The visualizer's duplicate robot uses mpc/<link>, with identical local coordinates.
+  if (!expectedFrame || expectedFrame->empty() ||
+      (msg.header.frame_id != *expectedFrame && msg.header.frame_id != "mpc/" + *expectedFrame)) {
+    RCLCPP_WARN_THROTTLE(logger, steadyClock, 1000, "Ignoring %s hand reference in frame '%s'; expected '%s'.", referenceName.c_str(),
+                         msg.header.frame_id.c_str(), expectedFrame ? expectedFrame->c_str() : "unconfigured");
+    return false;
+  }
   HandPoseReference reference;
   reference.positionInReferenceFrame << msg.pose.position.x, msg.pose.position.y, msg.pose.position.z;
+  quaternion_t orientation(msg.pose.orientation.w, msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z);
+  const scalar_t norm = orientation.coeffs().stableNorm();
+  if (!reference.positionInReferenceFrame.allFinite() || !orientation.coeffs().allFinite() || !std::isfinite(norm) || norm < 1e-12) {
+    RCLCPP_WARN_THROTTLE(logger, steadyClock, 1000, "Ignoring %s hand reference with invalid position or quaternion.",
+                         referenceName.c_str());
+    return false;
+  }
   reference.positionInReferenceFrame = clampHandPosition(referenceName, reference.positionInReferenceFrame);
-  reference.orientationReferenceToHand =
-      quaternion_t(msg.pose.orientation.w, msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z).normalized();
-  switchedModelReferenceManagerPtr_->getHandPoseReferenceManagerPtr()->setReference(referenceName, reference,
-                                                                                    handReferenceTransitionDuration_);
+  orientation.coeffs() /= norm;
+  reference.orientationReferenceToHand = orientation;
+  referenceManager->setReference(referenceName, reference, handReferenceTransitionDuration_);
+  return true;
 }
 
 vector3_t Ros2ProceduralMpcMotionManager::clampHandPosition(const std::string& referenceName,

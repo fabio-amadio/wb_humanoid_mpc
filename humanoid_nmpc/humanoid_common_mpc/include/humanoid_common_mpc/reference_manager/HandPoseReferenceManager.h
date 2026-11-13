@@ -23,6 +23,9 @@ struct HandPoseReference {
 
 class HandPoseReferenceManager {
  public:
+  void setReferenceFrame(const std::string& name, const std::string& frame);
+  std::optional<std::string> getReferenceFrame(const std::string& name) const;
+
   void setReference(const std::string& name, const HandPoseReference& reference, scalar_t transitionDuration = 0.0);
 
   std::optional<HandPoseReference> getReference(const std::string& name) const;
@@ -43,6 +46,7 @@ class HandPoseReferenceManager {
   static HandPoseReference interpolateReference(const TimedHandPoseReference& reference, scalar_t time);
 
   mutable std::mutex mutex_;
+  std::unordered_map<std::string, std::string> referenceFrames_;
   mutable std::unordered_map<std::string, TimedHandPoseReference> references_;
 };
 

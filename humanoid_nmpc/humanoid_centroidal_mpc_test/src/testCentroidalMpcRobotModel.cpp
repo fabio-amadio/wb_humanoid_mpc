@@ -2,6 +2,7 @@
 
 #include <Eigen/Core>
 #include <chrono>
+#include <limits>
 #include <memory>
 #include <thread>
 
@@ -375,4 +376,81 @@ TEST_F(CentroidalMpcRobotModelTest, BoundaryConditions) {
     EXPECT_NO_THROW(testingModelInterface.getMpcRobotModel().getContactForce(testInput, i));
     EXPECT_NO_THROW(testingModelInterface.getMpcRobotModel().getContactMoment(testInput, i));
   }
+}
+
+TEST_F(CentroidalMpcRobotModelTest, HandTargetsRejectMalformedPacketsAndRecover) {
+  const auto config = ament_index_cpp::get_package_share_directory("g1_centroidal_mpc");
+  CentroidalMpcInterface interface(config + "/config/mpc/task_hand_pose.info", testingModelInterface.urdfFile,
+                                   testingModelInterface.referenceFile, false);
+  const auto references = interface.getSwitchedModelReferenceManagerPtr()->getHandPoseReferenceManagerPtr();
+  const auto gaitFile = ament_index_cpp::get_package_share_directory("humanoid_common_mpc") + "/config/command/gait.info";
+  Ros2ProceduralMpcMotionManager manager(
+      gaitFile, testingModelInterface.referenceFile, interface.getSwitchedModelReferenceManagerPtr(), interface.getMpcRobotModel(),
+      [](const WalkingVelocityCommand&, scalar_t, scalar_t, const vector_t&) { return TargetTrajectories(); }, "g1");
+  for (const std::string name : {"left_hand", "right_hand"}) {
+    // Lightweight interfaces skip OCP construction, which normally registers task reference frames.
+    references->setReferenceFrame(name, "torso_link");
+    ASSERT_EQ(references->getReferenceFrame(name), std::optional<std::string>("torso_link"));
+    geometry_msgs::msg::PoseStamped valid;
+    valid.header.frame_id = "torso_link";
+    valid.pose.position.x = 0.3;
+    valid.pose.position.y = name == "left_hand" ? 0.2 : -0.2;
+    valid.pose.orientation.w = 2.0;
+    ASSERT_TRUE(manager.setHandPoseReference(name, valid));
+    const auto saved = references->getReference(name);
+    ASSERT_TRUE(saved);
+    EXPECT_NEAR(saved->orientationReferenceToHand.norm(), 1.0, 1e-12);
+    const auto rejected = [&](const geometry_msgs::msg::PoseStamped& packet) {
+      EXPECT_FALSE(manager.setHandPoseReference(name, packet));
+      const auto current = references->getReference(name);
+      ASSERT_TRUE(current);
+      EXPECT_TRUE(current->positionInReferenceFrame.isApprox(saved->positionInReferenceFrame));
+      EXPECT_TRUE(current->orientationReferenceToHand.coeffs().isApprox(saved->orientationReferenceToHand.coeffs()));
+    };
+    for (const auto& frame : {"", "world", "pelvis", "mpc/world"}) {
+      auto packet = valid;
+      packet.header.frame_id = frame;
+      rejected(packet);
+    }
+    for (const auto bad :
+         {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity()}) {
+      for (int component = 0; component < 7; ++component) {
+        auto packet = valid;
+        double* fields[] = {&packet.pose.position.x,    &packet.pose.position.y,    &packet.pose.position.z,   &packet.pose.orientation.x,
+                            &packet.pose.orientation.y, &packet.pose.orientation.z, &packet.pose.orientation.w};
+        *fields[component] = bad;
+        rejected(packet);
+      }
+    }
+    for (double norm : {0.0, 1e-15}) {
+      auto packet = valid;
+      packet.pose.orientation.w = norm;
+      rejected(packet);
+    }
+    // Recover using the visualizer frame and a large, non-unit quaternion.
+    auto next = valid;
+    next.header.frame_id = "mpc/torso_link";
+    next.pose.position.x = 0.35;
+    next.pose.orientation.w = 1e200;
+    next.pose.orientation.z = 1e200;
+    ASSERT_TRUE(manager.setHandPoseReference(name, next));
+    const auto recovered = references->getReference(name);
+    ASSERT_TRUE(recovered);
+    EXPECT_NEAR(recovered->positionInReferenceFrame.x(), 0.35, 1e-12);
+    EXPECT_NEAR(recovered->orientationReferenceToHand.norm(), 1.0, 1e-12);
+    EXPECT_NEAR(recovered->orientationReferenceToHand.w(), std::sqrt(0.5), 1e-12);
+    EXPECT_NEAR(recovered->orientationReferenceToHand.z(), std::sqrt(0.5), 1e-12);
+    next.pose.position.x = 1000.0;
+    ASSERT_TRUE(manager.setHandPoseReference(name, next));
+    EXPECT_NEAR(references->getReference(name)->positionInReferenceFrame.x(), 0.45, 1e-12);
+    references->setReferenceFrame(name, "custom_reference_link");
+    EXPECT_FALSE(manager.setHandPoseReference(name, next));
+    next.header.frame_id = "custom_reference_link";
+    ASSERT_TRUE(manager.setHandPoseReference(name, next));
+  }
+  geometry_msgs::msg::PoseStamped unconfigured;
+  unconfigured.header.frame_id = "torso_link";
+  unconfigured.pose.orientation.w = 1.0;
+  EXPECT_FALSE(manager.setHandPoseReference("unknown_hand", unconfigured));
+  EXPECT_FALSE(references->getReference("unknown_hand"));
 }

@@ -66,6 +66,9 @@ class Ros2ProceduralMpcMotionManager : public ProceduralMpcMotionManager {
 
   void setAndScaleVelocityCommand(const WalkingVelocityCommand& rawVelocityCommand) override;
 
+  /** Reject malformed or incorrectly framed targets without changing the last valid reference. */
+  bool setHandPoseReference(const std::string& referenceName, const geometry_msgs::msg::PoseStamped& msg);
+
   void subscribe(rclcpp::Node::SharedPtr nodeHandle, const rclcpp::QoS& qos);
 
  private:
@@ -83,7 +86,6 @@ class Ros2ProceduralMpcMotionManager : public ProceduralMpcMotionManager {
 
   WalkingVelocityCommand getScaledWalkingVelocityCommand(scalar_t time) override;
 
-  void setHandPoseReference(const std::string& referenceName, const geometry_msgs::msg::PoseStamped& msg);
   vector3_t clampHandPosition(const std::string& referenceName, const vector3_t& positionInReferenceFrame) const;
   vector3_t clampWaistOrientation(const vector3_t& desiredWaistOrientation) const;
   vector3_t interpolateWaistOrientation(scalar_t time) const;

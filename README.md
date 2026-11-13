@@ -136,6 +136,8 @@ RViz includes interactive markers under `Hand Pose Markers`. Moving them publish
 
 Both are expected in the `torso_link` frame.
 
+Hand targets must name the configured reference frame in `header.frame_id` (`torso_link` in the hand-pose task). The RViz alias `mpc/torso_link` is also accepted. Empty or different frame names, non-finite positions/orientations, and zero or near-zero quaternions are rejected while holding the last valid target. Valid quaternions are normalized before use; positions retain the configured workspace clamping. The receiver does not transform targets from other frames.
+
 ## Vive Locomotion Control
 
 To send commands to the MPC from an external Vive teleop source without the RViz interactive markers, use:

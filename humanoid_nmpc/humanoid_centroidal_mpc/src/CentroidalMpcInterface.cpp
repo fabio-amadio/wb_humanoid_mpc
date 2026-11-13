@@ -421,6 +421,7 @@ void CentroidalMpcInterface::addTaskSpaceKinematicsCosts(
 
       handPoseReferenceManagerPtr = referenceManagerPtr_->getHandPoseReferenceManagerPtr();
       handPoseReferenceName = costName;
+      handPoseReferenceManagerPtr->setReferenceFrame(handPoseReferenceName, referenceFrameName);
       handPoseReferenceManagerPtr->setReference(handPoseReferenceName, defaultReference);
       std::cout << "Initialized reference-frame pose reference for task `" << handPoseReferenceName << "` in frame `" << referenceFrameName
                 << "`" << std::endl;

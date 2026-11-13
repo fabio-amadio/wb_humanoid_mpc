@@ -7,6 +7,17 @@ Copyright (c) 2024, 1X Technologies. All rights reserved.
 
 namespace ocs2::humanoid {
 
+void HandPoseReferenceManager::setReferenceFrame(const std::string& name, const std::string& frame) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  referenceFrames_[name] = frame;
+}
+
+std::optional<std::string> HandPoseReferenceManager::getReferenceFrame(const std::string& name) const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  const auto it = referenceFrames_.find(name);
+  return it == referenceFrames_.end() ? std::nullopt : std::optional<std::string>(it->second);
+}
+
 HandPoseReference HandPoseReferenceManager::interpolateReference(const TimedHandPoseReference& reference, scalar_t time) {
   if (reference.transitionDuration <= 0.0) {
     return reference.goalReference;
