@@ -51,6 +51,8 @@ ProceduralMpcMotionManager::ProceduralMpcMotionManager(const std::string& gaitFi
       gaitSchedulePtr_(switchedModelReferenceManagerPtr_->getGaitSchedule()),
       mpcRobotModelPtr_(&mpcRobotModel),
       velocityCommandFilter(5, vector4_t::Zero()) {
+  loadData::loadCppDataType(referenceFile, "defaultBaseHeight", velocityCommand_.desired_pelvis_height);
+  velocityCommandFilter = BreakFrequencyAlphaFilter(5, velocityCommand_.toVector());
   loadData::loadCppDataType(referenceFile, "maxDisplacementVelocityX", maxDisplacementVelocityX_);
   loadData::loadCppDataType(referenceFile, "maxDisplacementVelocityY", maxDisplacementVelocityY_);
   loadData::loadCppDataType(referenceFile, "maxDeltaPelvisHeight", maxDeltaPelvisHeight_);

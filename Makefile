@@ -262,12 +262,12 @@ launch-g1-sim-locomotion:
 	source install/setup.bash && \
 	ros2 launch g1_centroidal_mpc mujoco_sim.launch.py
 
+.PHONY: launch-g1-sim-hand-pose
 launch-g1-sim-hand-pose:
 	cd ${build_dir} && \
 	source ${ros_source_file} && \
 	source install/setup.bash && \
-	ros2 launch g1_centroidal_mpc mujoco_sim_hands_cartesian.launch.py
-
+	bash "$(current_path)scripts/with_fast_qp.bash" ros2 launch g1_centroidal_mpc mujoco_sim_hands_cartesian.launch.py
 
 run-ocs2-tests:
 	echo "make sure you call 'make build-relwithdebinfo' to build the tests before running them." && \

@@ -281,27 +281,27 @@ joint_acceleration_cost
     scaling 1e-3
 
     ;; Waist joint velocities ;;
-    (24,24) 5.0      ;    waist_yaw_joint
-    (25,25) 5.0      ;    waist_roll_joint
-    (26,26) 5.0      ;    waist_pitch_joint
+    (24,24) 3.0      ;    waist_yaw_joint
+    (25,25) 3.0      ;    waist_roll_joint
+    (26,26) 3.0      ;    waist_pitch_joint
 
     ;; Left arm joint velocities ;;
-    (27,27) 5.0      ;    left_shoulder_pitch_joint
-    (28,28) 5.0      ;    left_shoulder_roll_joint
-    (29,29) 5.0      ;    left_shoulder_yaw_joint
-    (30,30) 5.0      ;    left_elbow_joint
-    (31,31) 10.0     ;    left_wrist_roll_joint
-    (32,32) 10.0     ;    left_wrist_pitch_joint
-    (33,33) 10.0     ;    left_wrist_yaw_joint
+    (27,27) 3.0      ;    left_shoulder_pitch_joint
+    (28,28) 3.0      ;    left_shoulder_roll_joint
+    (29,29) 3.0      ;    left_shoulder_yaw_joint
+    (30,30) 3.0      ;    left_elbow_joint
+    (31,31) 3.0     ;    left_wrist_roll_joint
+    (32,32) 3.0     ;    left_wrist_pitch_joint
+    (33,33) 3.0     ;    left_wrist_yaw_joint
 
     ;; Right arm joint velocities ;;
-    (34,34) 5.0      ;    right_shoulder_pitch_joint
-    (35,35) 5.0      ;    right_shoulder_roll_joint
-    (36,36) 5.0      ;    right_shoulder_yaw_joint
-    (37,37) 5.0      ;    right_elbow_joint
-    (38,38) 10.0     ;    right_wrist_roll_joint
-    (39,39) 10.0     ;    right_wrist_pitch_joint
-    (40,40) 10.0     ;    right_wrist_yaw_joint
+    (34,34) 3.0      ;    right_shoulder_pitch_joint
+    (35,35) 3.0      ;    right_shoulder_roll_joint
+    (36,36) 3.0      ;    right_shoulder_yaw_joint
+    (37,37) 3.0      ;    right_elbow_joint
+    (38,38) 3.0     ;    right_wrist_roll_joint
+    (39,39) 3.0     ;    right_wrist_pitch_joint
+    (40,40) 3.0     ;    right_wrist_yaw_joint
   }
 }
 

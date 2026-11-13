@@ -291,8 +291,8 @@ void MujocoSimInterface::setSimState(const model::RobotState& robotState) {
 
   // Joint State
   for (size_t i = 0; i < nActiveJoints_; ++i) {
-    mujocoData_->qpos[i + 7] = robotStateInternal_.getJointPosition(activeRobotJointStateIndices_[i]);
-    mujocoData_->qvel[i + 6] = robotStateInternal_.getJointVelocity(activeRobotJointStateIndices_[i]);
+    mujocoData_->qpos[i + 7] = robotState.getJointPosition(activeRobotJointStateIndices_[i]);
+    mujocoData_->qvel[i + 6] = robotState.getJointVelocity(activeRobotJointStateIndices_[i]);
   }
 }
 

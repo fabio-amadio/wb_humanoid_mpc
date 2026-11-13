@@ -96,6 +96,10 @@ target_link_libraries(mujoco_sim_no_torques
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
+  find_package(g1_description REQUIRED)
+  ament_add_gtest(test_initial_state test/testInitialState.cpp)
+  ament_target_dependencies(test_initial_state ${dependencies} ament_index_cpp)
+  target_link_libraries(test_initial_state ${PROJECT_NAME})
 
 endif()
 

@@ -6,6 +6,7 @@
 #include <memory>
 #include <thread>
 
+#include "humanoid_centroidal_mpc/command/CentroidalMpcTargetTrajectoriesCalculator.h"
 #include "humanoid_centroidal_mpc/common/CentroidalMpcRobotModel.h"
 #include "humanoid_centroidal_mpc/mrt/CentroidalMpcMrtJointController.h"
 #include "humanoid_common_mpc/common/ModelSettings.h"
@@ -13,6 +14,7 @@
 #include "humanoid_common_mpc_ros2/ros_comm/Ros2ProceduralMpcMotionManager.h"
 
 #include <ocs2_centroidal_model/CentroidalModelInfo.h>
+#include <ocs2_core/misc/LoadData.h>
 #include <ocs2_pinocchio_interface/PinocchioInterface.h>
 #include "humanoid_centroidal_mpc_test/CentroidalTestingModelInterface.h"
 
@@ -113,6 +115,61 @@ TEST_F(CentroidalMpcRobotModelTest, ResetTargetPreservesConfigurationAndClearsMo
   EXPECT_TRUE(state.tail(state.size() - 12).isApprox(observation.state.tail(state.size() - 12)));
   EXPECT_EQ(target.inputTrajectory.front().size(), observation.input.size());
   EXPECT_TRUE(target.inputTrajectory.front().isZero());
+}
+
+TEST_F(CentroidalMpcRobotModelTest, VelocityTargetsStartAtConfiguredHeightAndSmoothHeightChanges) {
+  scalar_t height = 0.0;
+  loadData::loadCppDataType(testingModelInterface.referenceFile, "defaultBaseHeight", height);
+  CentroidalMpcTargetTrajectoriesCalculator calculator(testingModelInterface.referenceFile, testingModelInterface.getMpcRobotModel(),
+                                                       testingModelInterface.getPinocchioInterface(),
+                                                       testingModelInterface.getCentroidalModelInfo(), 1.0);
+  vector_t state = vector_t::Zero(testingModelInterface.getMpcRobotModel().getStateDim());
+  state[8] = height;
+  WalkingVelocityCommand command(0.0, 0.0, height, 0.0);
+  const auto stationary = calculator.commandedVelocityToTargetTrajectories(command, 0.0, state);
+  for (const auto& target : stationary.stateTrajectory) {
+    EXPECT_TRUE(target.allFinite());
+    EXPECT_NEAR(target[8], height, 1e-12);
+    EXPECT_TRUE(target.head<6>().isZero(1e-12));
+  }
+  command.desired_pelvis_height = height - 0.1;
+  const auto lower = calculator.commandedVelocityToTargetTrajectories(command, 0.02, state);
+  EXPECT_NEAR(lower.stateTrajectory.front()[8], height, 1e-12);
+  EXPECT_NEAR(lower.stateTrajectory.back()[8], height - 0.02, 1e-12);
+  for (const auto& target : lower.stateTrajectory) {
+    EXPECT_TRUE(target.allFinite());
+    EXPECT_GE(target[8], command.desired_pelvis_height);
+    EXPECT_LE(target[8], height + 1e-12);
+  }
+}
+
+TEST_F(CentroidalMpcRobotModelTest, FirstMotionManagerTargetUsesConfiguredHeightWithoutCommands) {
+  CentroidalMpcInterface interface(testingModelInterface.taskFile, testingModelInterface.urdfFile, testingModelInterface.referenceFile,
+                                   false);
+  scalar_t height = 0.0;
+  loadData::loadCppDataType(testingModelInterface.referenceFile, "defaultBaseHeight", height);
+  CentroidalMpcTargetTrajectoriesCalculator calculator(testingModelInterface.referenceFile, interface.getMpcRobotModel(),
+                                                       interface.getPinocchioInterface(), interface.getCentroidalModelInfo(), 1.0);
+  TargetTrajectories captured;
+  scalar_t receivedHeight = 0.0;
+  const auto gaitFile = ament_index_cpp::get_package_share_directory("humanoid_common_mpc") + "/config/command/gait.info";
+  Ros2ProceduralMpcMotionManager manager(
+      gaitFile, testingModelInterface.referenceFile, interface.getSwitchedModelReferenceManagerPtr(), interface.getMpcRobotModel(),
+      [&](const WalkingVelocityCommand& command, scalar_t start, scalar_t, const vector_t& state) {
+        receivedHeight = command.desired_pelvis_height;
+        captured = calculator.commandedVelocityToTargetTrajectories(command, start, state);
+        return captured;
+      },
+      "g1");
+  vector_t state = interface.getInitialState();
+  state[8] = height;
+  manager.preSolverRun(0.0, 1.0, state, *interface.getReferenceManagerPtr());
+  EXPECT_NEAR(receivedHeight, height, 1e-12);
+  ASSERT_FALSE(captured.stateTrajectory.empty());
+  for (const auto& target : captured.stateTrajectory) {
+    EXPECT_TRUE(target.allFinite());
+    EXPECT_NEAR(target[8], height, 1e-12);
+  }
 }
 
 TEST_F(CentroidalMpcRobotModelTest, ExpiredWalkingCommandStopsMotionAndPreservesPosture) {

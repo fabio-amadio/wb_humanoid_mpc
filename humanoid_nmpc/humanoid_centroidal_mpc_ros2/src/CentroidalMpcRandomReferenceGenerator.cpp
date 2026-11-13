@@ -1668,7 +1668,9 @@ void generateMotion(const Options& options, const std::filesystem::path& outputP
     }
   }
   auto gaitSchedulePtr = interface.getSwitchedModelReferenceManagerPtr()->getGaitSchedule();
-  BreakFrequencyAlphaFilter velocityCommandFilter(5, vector4_t::Zero());
+  vector4_t initialBaseCommand = vector4_t::Zero();
+  initialBaseCommand[2] = defaultBaseHeight;
+  BreakFrequencyAlphaFilter velocityCommandFilter(5, initialBaseCommand);
   size_t currentGaitMode = 0;
   std::string currentGaitCommand = gaitModeStates[currentGaitMode].gaitCommand;
   std::string lastGaitCommand = currentGaitCommand;

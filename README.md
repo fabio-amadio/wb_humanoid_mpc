@@ -125,6 +125,8 @@ Launch the **hand-pose task** in the MuJoCo sim:
 make launch-g1-sim-hand-pose
 ```
 
+This target uses the optional [optimized QP backend](#faster-qp-backend-with-the-acceleration-cost); build it once before using the target.
+
 ## Hand Pose Control
 
 The hand-pose launch exposes torso-frame hand references for both hands.
@@ -438,7 +440,15 @@ bash scripts/with_fast_qp.bash ros2 launch \
   publish_mpc_motion_reference:=true
 ```
 
-The wrapper sources ROS and the workspace before selecting the optimized libraries. Use it with the direct `ros2` command; Make launch targets source the workspace again and can override library selection. Ordinary launch commands continue using the standard backend. Restart the launch to switch backends.
+The hand-pose task in MuJoCo uses the optimized backend by default:
+
+```bash
+make launch-g1-sim-hand-pose
+```
+
+This selects the same augmented-state acceleration cost with the optimized libraries. In the headless stationary startup check on this machine, the optimized backend kept the robot upright; the generic backend missed the MPC timing budget and the robot fell.
+
+The wrapper sources ROS and the workspace before selecting the optimized libraries. The `launch-g1-sim-hand-pose` target invokes it automatically. For other launches, use the wrapper with a direct `ros2` command: wrapping a Make target can override library selection when it sources the workspace again. Other Make launch targets continue using the standard backend. Restart the launch to switch backends.
 
 For a repeatable walking comparison with the acceleration cost active:
 

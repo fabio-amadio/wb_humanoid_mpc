@@ -70,11 +70,9 @@ def test_commands_and_robot_start_at_zero_and_share_the_time_grid(exports, fps):
         assert motion["time"][0] == 0
         assert motion["time"][-1] <= 0.13
         # This fails if row zero is a post-rollout state relabeled as t=0.
-        np.testing.assert_allclose(
+        np.testing.assert_array_equal(
             motion["joint_pos"][0],
-            [initial[i] for i in range(12, 41)],
-            atol=1e-8,
-            rtol=0,
+            np.array([initial[i] for i in range(12, 41)], dtype=np.float32),
         )
         pelvis = list(motion["body_names"].astype(str)).index("pelvis")
         np.testing.assert_allclose(

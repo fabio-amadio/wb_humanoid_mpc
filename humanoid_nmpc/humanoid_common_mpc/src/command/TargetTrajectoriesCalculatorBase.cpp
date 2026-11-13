@@ -48,6 +48,7 @@ TargetTrajectoriesCalculatorBase::TargetTrajectoriesCalculatorBase(const std::st
   std::cerr << "Loading reference file: " << referenceFile << std::endl;
   targetJointState_.resize(mpcRobotModel.getJointDim());
   loadData::loadCppDataType(referenceFile, "defaultBaseHeight", defaultBaseHeight_);
+  commVelFiltered_(2) = defaultBaseHeight_;
   loadData::loadEigenMatrix(referenceFile, "defaultJointState", targetJointState_);
   loadData::loadCppDataType(referenceFile, "targetRotationVelocity", targetRotationVelocity_);
   loadData::loadCppDataType(referenceFile, "targetDisplacementVelocity", targetDisplacementVelocity_);

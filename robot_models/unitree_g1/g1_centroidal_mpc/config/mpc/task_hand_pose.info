@@ -132,36 +132,36 @@ initialState
   (10,0) 0.0     ; theta_base_y
   (11,0) 0.0     ; theta_base_x
 
-  ;; Joint Positions: ;;
-  (12,0)  -0.05     ; left_hip_pitch_joint
-  (13,0)   0.0      ; left_hip_roll_joint
-  (14,0)   0.0      ; left_hip_yaw_joint
-  (15,0)   0.1      ; left_knee_joint
-  (16,0)  -0.05     ; left_ankle_pitch_joint
-  (17,0)   0.0      ; left_ankle_roll_joint
-  (18,0)  -0.05     ; right_hip_pitch_joint
-  (19,0)   0.0      ; right_hip_roll_joint
-  (20,0)   0.0      ; right_hip_yaw_joint
-  (21,0)   0.1      ; right_knee_joint
-  (22,0) -0.05      ; right_ankle_pitch_joint
-  (23,0)  0.0       ; right_ankle_roll_joint
-  (24,0)  0.0       ; waist_yaw_joint
-  (25,0)  0.0       ; waist_roll_joint
-  (26,0)  0.0       ; waist_pitch_joint
-  (27,0)  0.0       ; left_shoulder_pitch_joint
-  (28,0)  0.0       ; left_shoulder_roll_joint
-  (29,0)  0.0       ; left_shoulder_yaw_joint
-  (30,0)  0.0       ; left_elbow_joint
-  (31,0)  0.0       ; left_wrist_roll_joint
-  (32,0)  0.0       ; left_wrist_pitch_joint
-  (33,0)  0.0       ; left_wrist_yaw_joint
-  (34,0)  0.0       ; right_shoulder_pitch_joint
-  (35,0)  0.0       ; right_shoulder_roll_joint
-  (36,0)  0.0       ; right_shoulder_yaw_joint
-  (37,0)  0.0       ; right_elbow_joint
-  (38,0)  0.0       ; right_wrist_roll_joint
-  (39,0)  0.0       ; right_wrist_pitch_joint
-  (40,0)  0.0       ; right_wrist_yaw_joint
+  ;; Joint Positions: settled zero-command standing posture [rad] ;;
+  (12,0)  -0.349    ; left_hip_pitch_joint
+  (13,0)   0.000    ; left_hip_roll_joint
+  (14,0)   0.000    ; left_hip_yaw_joint
+  (15,0)   0.723    ; left_knee_joint
+  (16,0)  -0.369    ; left_ankle_pitch_joint
+  (17,0)   0.000    ; left_ankle_roll_joint
+  (18,0)  -0.349    ; right_hip_pitch_joint
+  (19,0)   0.000    ; right_hip_roll_joint
+  (20,0)   0.000    ; right_hip_yaw_joint
+  (21,0)   0.723    ; right_knee_joint
+  (22,0)  -0.369    ; right_ankle_pitch_joint
+  (23,0)   0.000    ; right_ankle_roll_joint
+  (24,0)   0.000    ; waist_yaw_joint
+  (25,0)   0.000    ; waist_roll_joint
+  (26,0)   0.006    ; waist_pitch_joint
+  (27,0)  -0.016    ; left_shoulder_pitch_joint
+  (28,0)   0.148    ; left_shoulder_roll_joint
+  (29,0)  -0.103    ; left_shoulder_yaw_joint
+  (30,0)   0.003    ; left_elbow_joint
+  (31,0)  -0.146    ; left_wrist_roll_joint
+  (32,0)  -0.003    ; left_wrist_pitch_joint
+  (33,0)   0.103    ; left_wrist_yaw_joint
+  (34,0)  -0.016    ; right_shoulder_pitch_joint
+  (35,0)  -0.148    ; right_shoulder_roll_joint
+  (36,0)   0.103    ; right_shoulder_yaw_joint
+  (37,0)   0.003    ; right_elbow_joint
+  (38,0)   0.146    ; right_wrist_roll_joint
+  (39,0)  -0.003    ; right_wrist_pitch_joint
+  (40,0)  -0.103    ; right_wrist_yaw_joint
 }
 
 ; standard state weight matrix
@@ -281,27 +281,27 @@ joint_acceleration_cost
     scaling 1e-3
 
     ;; Waist joint velocities ;;
-    (24,24) 5.0      ;    waist_yaw_joint
-    (25,25) 5.0      ;    waist_roll_joint
-    (26,26) 5.0      ;    waist_pitch_joint
+    (24,24) 3.0      ;    waist_yaw_joint
+    (25,25) 3.0      ;    waist_roll_joint
+    (26,26) 3.0      ;    waist_pitch_joint
 
     ;; Left arm joint velocities ;;
-    (27,27) 5.0      ;    left_shoulder_pitch_joint
-    (28,28) 5.0      ;    left_shoulder_roll_joint
-    (29,29) 5.0      ;    left_shoulder_yaw_joint
-    (30,30) 5.0      ;    left_elbow_joint
-    (31,31) 10.0     ;    left_wrist_roll_joint
-    (32,32) 10.0     ;    left_wrist_pitch_joint
-    (33,33) 10.0     ;    left_wrist_yaw_joint
+    (27,27) 3.0      ;    left_shoulder_pitch_joint
+    (28,28) 3.0      ;    left_shoulder_roll_joint
+    (29,29) 3.0      ;    left_shoulder_yaw_joint
+    (30,30) 3.0      ;    left_elbow_joint
+    (31,31) 3.0     ;    left_wrist_roll_joint
+    (32,32) 3.0     ;    left_wrist_pitch_joint
+    (33,33) 3.0     ;    left_wrist_yaw_joint
 
     ;; Right arm joint velocities ;;
-    (34,34) 5.0      ;    right_shoulder_pitch_joint
-    (35,35) 5.0      ;    right_shoulder_roll_joint
-    (36,36) 5.0      ;    right_shoulder_yaw_joint
-    (37,37) 5.0      ;    right_elbow_joint
-    (38,38) 10.0     ;    right_wrist_roll_joint
-    (39,39) 10.0     ;    right_wrist_pitch_joint
-    (40,40) 10.0     ;    right_wrist_yaw_joint
+    (34,34) 3.0      ;    right_shoulder_pitch_joint
+    (35,35) 3.0      ;    right_shoulder_roll_joint
+    (36,36) 3.0      ;    right_shoulder_yaw_joint
+    (37,37) 3.0      ;    right_elbow_joint
+    (38,38) 3.0     ;    right_wrist_roll_joint
+    (39,39) 3.0     ;    right_wrist_pitch_joint
+    (40,40) 3.0     ;    right_wrist_yaw_joint
   }
 }
 
